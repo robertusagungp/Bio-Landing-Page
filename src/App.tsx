@@ -7,26 +7,20 @@ import {
 import { 
   getStoredProfile, 
   getStoredResults, 
-  resetUserData 
+  updateStoredProfile 
 } from './utils/storage';
 
-// Layout components
+// Minimal layout components
 import { Navbar } from './components/layout/Navbar';
-import { BottomNavigation } from './components/layout/BottomNavigation';
 import { Footer } from './components/layout/Footer';
-import { WhatsAppFloating } from './components/layout/WhatsAppFloating';
 
-// Profile & Homepage sections
-import { HeroSection } from './components/profile/HeroSection';
-import { ThreeCuriosityCards } from './components/tools/ThreeCuriosityCards';
-import { WhyThisExists } from './components/profile/WhyThisExists';
-import { AllToolsGrid } from './components/tools/AllToolsGrid';
-import { SavedScoreSummary } from './components/profile/SavedScoreSummary';
-import { EducationalArticles } from './components/insights/EducationalArticles';
-import { AboutSection } from './components/profile/AboutSection';
-import { PersonalConsultationSection } from './components/consultation/PersonalConsultationSection';
+// Pages
+import { SimplifiedHome } from './components/home/SimplifiedHome';
+import { ToolsCatalogPage } from './components/pages/ToolsCatalogPage';
+import { AboutRobertPage } from './components/pages/AboutRobertPage';
+import { LegalModal } from './components/pages/LegalModal';
 
-// Tool runners
+// Rich Tool Runners (100% Preserved)
 import { LifeReadinessRunner } from './components/tools/runners/LifeReadinessRunner';
 import { LifestyleAgeRunner } from './components/tools/runners/LifestyleAgeRunner';
 import { WellnessRunner } from './components/tools/runners/WellnessRunner';
@@ -40,7 +34,8 @@ export function App() {
   const [profile, setProfile] = useState<UserProfile>(getStoredProfile());
   const [results, setResults] = useState<StoredResults>(getStoredResults());
   const [activeTool, setActiveTool] = useState<ActiveToolId | null>(null);
-  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'score' | 'about'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'about'>('home');
+  const [legalModal, setLegalModal] = useState<'privacy' | 'disclaimer' | null>(null);
 
   useEffect(() => {
     const handleProfileUpdate = () => setProfile(getStoredProfile());
@@ -65,48 +60,21 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNavigation = (view: 'home' | 'tools' | 'score' | 'about') => {
+  const handleNavigation = (view: 'home' | 'tools' | 'about') => {
     setCurrentView(view);
     setActiveTool(null);
-
-    if (view === 'home') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (view === 'tools') {
-      const el = document.getElementById('tools');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    } else if (view === 'about') {
-      const el = document.getElementById('about');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    } else if (view === 'score') {
-      // open last completed tool or life-readiness
-      if (results.lastCompletedTool) {
-        setActiveTool(results.lastCompletedTool);
-      } else if (results.lifeReadiness) {
-        setActiveTool('life-readiness');
-      } else {
-        setActiveTool('life-readiness');
-      }
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const hasScore = !!(
-    results.lifeReadiness ||
-    results.financialHealth ||
-    results.lifestyleAge ||
-    results.emergencyRunway ||
-    results.familyReadiness ||
-    results.wellness
-  );
-
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground antialiased">
-      {/* Sticky Personal Branding Navbar */}
+    <div className="min-h-screen flex flex-col bg-background text-foreground antialiased font-sans">
+      {/* Minimal Top Header */}
       <Navbar onNavigate={handleNavigation} currentView={currentView} />
 
       {/* Main Content Area */}
       <main className="flex-1">
         {activeTool ? (
-          /* ACTIVE TOOL RUNNER VIEW */
+          /* ACTIVE INTERACTIVE TOOL VIEW (Full depth & calculation intact) */
           <div className="py-2">
             {activeTool === 'life-readiness' && (
               <LifeReadinessRunner
@@ -174,70 +142,48 @@ export function App() {
             )}
           </div>
         ) : (
-          /* HOMEPAGE HIERARCHY (Section 39) */
+          /* DEDICATED VIEWS */
           <>
-            {/* 1 & 2. Hero Section with Primary CTA */}
-            <HeroSection
-              onStartLifeReadiness={() => handleSelectTool('life-readiness')}
-              onExploreTools={() => {
-                const el = document.getElementById('tools');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
+            {currentView === 'home' && (
+              <SimplifiedHome
+                onStartLifeScore={() => handleSelectTool('life-readiness')}
+                onSelectTool={handleSelectTool}
+                onNavigateToTools={() => handleNavigation('tools')}
+                onNavigateToAbout={() => handleNavigation('about')}
+                savedLifeScore={results.lifeReadiness}
+                onRetakeLifeScore={() => handleSelectTool('life-readiness')}
+              />
+            )}
 
-            {/* 3. Three Curiosity Cards */}
-            <ThreeCuriosityCards
-              onSelectTool={handleSelectTool}
-              onExploreAll={() => {
-                const el = document.getElementById('tools');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
+            {currentView === 'tools' && (
+              <ToolsCatalogPage
+                onSelectTool={handleSelectTool}
+                onBackToHome={() => handleNavigation('home')}
+                results={results}
+              />
+            )}
 
-            {/* 4. Why This Exists */}
-            <WhyThisExists />
-
-            {/* 5. All 8 Free Tools Grid */}
-            <AllToolsGrid
-              onSelectTool={handleSelectTool}
-              results={results}
-            />
-
-            {/* 6. Saved Score Summary (If Available) */}
-            <SavedScoreSummary
-              results={results}
-              onSelectTool={handleSelectTool}
-            />
-
-            {/* 7. Short Educational Insights Articles */}
-            <EducationalArticles />
-
-            {/* 8. About Robert */}
-            <AboutSection />
-
-            {/* 9. Optional Personal Discussion CTA */}
-            <PersonalConsultationSection />
+            {currentView === 'about' && (
+              <AboutRobertPage
+                onBackToHome={() => handleNavigation('home')}
+              />
+            )}
           </>
         )}
       </main>
 
-      {/* Subtle Floating WhatsApp Consultation */}
-      <WhatsAppFloating 
-        lastCompletedTool={results.lastCompletedTool} 
-        isBottomNavVisible={!activeTool}
-      />
-
-      {/* Mobile Bottom Navigation - hidden when active tool is running */}
+      {/* Minimal Clean Footer */}
       {!activeTool && (
-        <BottomNavigation
-          currentView={currentView}
-          onNavigate={handleNavigation}
-          hasScore={hasScore}
-        />
+        <Footer onOpenLegal={(type) => setLegalModal(type)} />
       )}
 
-      {/* Footer with Privacy and Disclaimer */}
-      <Footer />
+      {/* Privacy / Disclaimer Modal */}
+      {legalModal && (
+        <LegalModal
+          type={legalModal}
+          onClose={() => setLegalModal(null)}
+        />
+      )}
     </div>
   );
 }
