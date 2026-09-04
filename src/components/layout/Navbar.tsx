@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { resetUserData } from '../../utils/storage';
 
 interface NavbarProps {
@@ -16,41 +16,47 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentView }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-background/85 backdrop-blur-md border-b border-border transition-all duration-200">
-      <div className="max-w-[760px] mx-auto px-4 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border transition-all duration-200">
+      <div className="max-w-[760px] mx-auto px-3.5 sm:px-4 h-15 sm:h-16 flex items-center justify-between">
+        {/* Brand & Avatar */}
         <button 
           onClick={() => onNavigate('home')} 
-          className="flex items-center gap-2.5 text-left group"
+          className="flex items-center gap-2 sm:gap-2.5 text-left group"
         >
-          <div className="w-9 h-9 rounded-full bg-teal-brand text-background flex items-center justify-center font-bold text-sm shadow-soft group-hover:scale-105 transition-transform">
-            RP
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-teal-brand/30 p-0.5 bg-card shadow-soft overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
+            <img
+              src="/foto-robert.png"
+              alt="Robertus Agung Pradana"
+              className="w-full h-full object-cover object-[center_12%]"
+            />
           </div>
           <div>
-            <div className="text-sm font-bold tracking-tight text-foreground flex items-center gap-1.5">
-              Robertus Agung Pradana
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-sage"></span>
+            <div className="text-xs sm:text-sm font-bold tracking-tight text-foreground flex items-center gap-1 sm:gap-1.5">
+              <span>Robertus Agung Pradana</span>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-sage shrink-0"></span>
             </div>
-            <div className="text-[11px] text-muted font-medium">
+            <div className="text-[10px] sm:text-[11px] text-muted font-medium line-clamp-1">
               Data • Health • Financial Readiness
             </div>
           </div>
         </button>
 
-        <div className="flex items-center gap-2">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <button
             onClick={() => onNavigate('tools')}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+            className={`text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors ${
               currentView === 'tools' 
                 ? 'bg-teal-brand text-white' 
                 : 'text-muted hover:text-foreground hover:bg-section'
             }`}
           >
-            Free Tools
+            Tools
           </button>
           
           <button
             onClick={() => onNavigate('about')}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+            className={`text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-full transition-colors ${
               currentView === 'about' 
                 ? 'bg-teal-brand text-white' 
                 : 'text-muted hover:text-foreground hover:bg-section'
@@ -65,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, currentView }) => {
             aria-label="Reset Data Tersimpan"
             className="p-1.5 text-muted hover:text-terracotta hover:bg-terracotta/10 rounded-full transition-colors"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

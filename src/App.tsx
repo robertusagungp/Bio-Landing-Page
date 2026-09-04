@@ -222,14 +222,19 @@ export function App() {
       </main>
 
       {/* Subtle Floating WhatsApp Consultation */}
-      <WhatsAppFloating lastCompletedTool={results.lastCompletedTool} />
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNavigation
-        currentView={currentView}
-        onNavigate={handleNavigation}
-        hasScore={hasScore}
+      <WhatsAppFloating 
+        lastCompletedTool={results.lastCompletedTool} 
+        isBottomNavVisible={!activeTool}
       />
+
+      {/* Mobile Bottom Navigation - hidden when active tool is running */}
+      {!activeTool && (
+        <BottomNavigation
+          currentView={currentView}
+          onNavigate={handleNavigation}
+          hasScore={hasScore}
+        />
+      )}
 
       {/* Footer with Privacy and Disclaimer */}
       <Footer />

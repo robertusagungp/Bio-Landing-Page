@@ -1,24 +1,43 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, UserCheck, HeartHandshake, Compass } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 import { TrustChips } from './TrustChips';
 
 export const AboutSection: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <section id="about" className="py-12 px-4 max-w-[760px] mx-auto">
-      <div className="bg-card border border-border rounded-card-lg p-6 sm:p-8 shadow-soft">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-teal-brand/10 text-teal-brand flex items-center justify-center font-bold text-base">
-            RA
+    <section id="about" className="py-10 sm:py-12 px-4 max-w-[760px] mx-auto">
+      <div className="bg-card border border-border rounded-card-lg p-5 sm:p-8 shadow-soft">
+        {/* Profile Card Header with Robert's Photo */}
+        <div className="flex items-center gap-3.5 sm:gap-4 mb-5 pb-4 border-b border-border/70">
+          <div className="relative">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-teal-brand/30 p-0.5 bg-card shadow-soft overflow-hidden shrink-0">
+              <img
+                src="/foto-robert.png"
+                alt="Robertus Agung Pradana"
+                className="w-full h-full object-cover object-[center_12%]"
+              />
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 bg-sage text-white p-0.5 rounded-full border-2 border-white">
+              <CheckCircle2 className="w-3 h-3" />
+            </div>
           </div>
+
           <div>
-            <h3 className="text-lg font-bold text-foreground">Tentang Robert</h3>
-            <p className="text-xs text-muted">Data • Health • Quantitative Risk</p>
+            <h3 className="text-base sm:text-lg font-bold text-foreground leading-snug">
+              Robertus Agung Pradana
+            </h3>
+            <p className="text-xs text-teal-brand font-semibold">
+              Data • Health • Quantitative Risk
+            </p>
+            <span className="inline-block text-[10px] text-muted bg-section px-2 py-0.5 rounded-full mt-1">
+              Inisiator & Pengembang Hub
+            </span>
           </div>
         </div>
 
-        <div className="space-y-4 text-sm text-foreground/90 leading-relaxed font-normal">
+        {/* Bio Copy */}
+        <div className="space-y-3.5 text-xs sm:text-sm text-foreground/90 leading-relaxed font-normal">
           <p>
             Halo, saya <strong>Robertus Agung Pradana</strong>.
           </p>
@@ -47,14 +66,16 @@ export const AboutSection: React.FC = () => {
           )}
         </div>
 
+        {/* Trust Chips */}
         <div className="mt-6 pt-5 border-t border-border">
           <TrustChips />
         </div>
 
+        {/* Expand / Collapse Button */}
         <div className="mt-5 text-center">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-brand hover:text-teal-dark transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-brand hover:text-teal-dark transition-colors py-1 px-3 rounded-full hover:bg-section"
           >
             <span>{isExpanded ? 'Tutup detail' : 'Baca prinsip selengkapnya'}</span>
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

@@ -5,9 +5,13 @@ import { ActiveToolId } from '../../types/profile';
 
 interface WhatsAppFloatingProps {
   lastCompletedTool?: ActiveToolId;
+  isBottomNavVisible?: boolean;
 }
 
-export const WhatsAppFloating: React.FC<WhatsAppFloatingProps> = ({ lastCompletedTool }) => {
+export const WhatsAppFloating: React.FC<WhatsAppFloatingProps> = ({ 
+  lastCompletedTool,
+  isBottomNavVisible = true
+}) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const getContextKey = () => {
@@ -26,9 +30,12 @@ export const WhatsAppFloating: React.FC<WhatsAppFloatingProps> = ({ lastComplete
   const link = getWhatsAppLink(getContextKey());
 
   return (
-    <aside aria-label="Konsultasi WhatsApp" className="fixed bottom-16 sm:bottom-6 right-4 sm:right-6 z-40">
+    <aside 
+      aria-label="Konsultasi WhatsApp" 
+      className={`fixed ${isBottomNavVisible ? 'bottom-20' : 'bottom-5'} sm:bottom-6 right-3.5 sm:right-6 z-40 transition-all duration-300`}
+    >
       {isOpen && (
-        <div className="mb-3 p-4 bg-card border border-border rounded-card shadow-elevated max-w-[280px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="mb-2.5 p-4 bg-card border border-border rounded-card shadow-elevated max-w-[280px] animate-in fade-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="text-xs font-bold text-foreground">
               Tanya Robert via WhatsApp
@@ -58,7 +65,7 @@ export const WhatsAppFloating: React.FC<WhatsAppFloatingProps> = ({ lastComplete
 
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 bg-card hover:bg-white text-foreground border border-border/80 px-3.5 py-2.5 rounded-full shadow-card hover:shadow-elevated transition-all active:scale-95 group"
+        className="flex items-center gap-2 bg-card hover:bg-white text-foreground border border-border/90 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-full shadow-card hover:shadow-elevated transition-all active:scale-95 group"
         aria-label="Buka bantuan konsultasi via WhatsApp"
       >
         <div className="w-7 h-7 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center group-hover:scale-110 transition-transform">
