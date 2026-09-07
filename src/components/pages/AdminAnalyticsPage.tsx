@@ -5,86 +5,20 @@ import {
   CheckCircle2, 
   TrendingUp, 
   MessageCircle, 
-  ShieldAlert, 
   ArrowLeft, 
   Lock, 
   RefreshCw, 
   Trash2, 
   Filter, 
   ExternalLink,
-  ChevronRight,
-  PieChart
+  PieChart,
+  Info
 } from 'lucide-react';
 import { getLocalAnalyticsEvents, clearLocalAnalyticsEvents, StoredLocalEvent } from '../../utils/analytics';
 
 interface AdminAnalyticsPageProps {
   onBackToHome: () => void;
 }
-
-// Baseline mock data so the dashboard looks realistic immediately
-const MOCK_BASELINE_EVENTS: StoredLocalEvent[] = [
-  // Visitors
-  ...Array.from({ length: 142 }).map((_, i) => ({
-    id: `mock-pv-${i}`,
-    eventName: 'page_view' as const,
-    properties: {
-      page: i % 4 === 0 ? 'tools_catalog' : i % 5 === 0 ? 'about' : 'home',
-      first_touch_source: i % 3 === 0 ? 'instagram' : i % 4 === 0 ? 'linkedin' : i % 7 === 0 ? 'whatsapp' : 'direct',
-      first_touch_medium: i % 3 === 0 ? 'bio' : i % 4 === 0 ? 'post' : 'none',
-      first_touch_campaign: i % 3 === 0 ? 'wellness_awareness' : undefined,
-    },
-    timestamp: new Date(Date.now() - (i * 3600000)).toISOString(),
-  })),
-  // Starts
-  ...Array.from({ length: 88 }).map((_, i) => ({
-    id: `mock-ts-${i}`,
-    eventName: 'tool_started' as const,
-    properties: {
-      tool_name: i % 3 === 0 ? 'life_readiness' : i % 5 === 0 ? 'lifestyle_age' : i % 4 === 0 ? 'emergency_checker' : 'medical_simulator',
-      first_touch_source: i % 2 === 0 ? 'instagram' : 'direct',
-    },
-    timestamp: new Date(Date.now() - (i * 4200000)).toISOString(),
-  })),
-  // Completions
-  ...Array.from({ length: 64 }).map((_, i) => ({
-    id: `mock-tc-${i}`,
-    eventName: 'tool_completed' as const,
-    properties: {
-      tool_name: i % 3 === 0 ? 'life_readiness' : i % 5 === 0 ? 'lifestyle_age' : i % 4 === 0 ? 'emergency_checker' : 'medical_simulator',
-      duration_sec: 75 + (i * 2),
-      score_bracket: i % 3 === 0 ? 'safe' : 'medium',
-    },
-    timestamp: new Date(Date.now() - (i * 4500000)).toISOString(),
-  })),
-  // Risk education
-  ...Array.from({ length: 39 }).map((_, i) => ({
-    id: `mock-re-${i}`,
-    eventName: 'risk_management_option_clicked' as const,
-    properties: {
-      option_name: i % 2 === 0 ? 'protection' : 'emergency',
-    },
-    timestamp: new Date(Date.now() - (i * 5000000)).toISOString(),
-  })),
-  // Protection gap opened
-  ...Array.from({ length: 24 }).map((_, i) => ({
-    id: `mock-pg-${i}`,
-    eventName: 'protection_gap_opened' as const,
-    properties: {
-      source: 'result_bridge',
-    },
-    timestamp: new Date(Date.now() - (i * 6000000)).toISOString(),
-  })),
-  // WhatsApp Clicks
-  ...Array.from({ length: 18 }).map((_, i) => ({
-    id: `mock-wa-${i}`,
-    eventName: 'whatsapp_clicked' as const,
-    properties: {
-      source_tool: i % 2 === 0 ? 'Life Score' : 'Protection Gap',
-      button_location: 'result_card_footer',
-    },
-    timestamp: new Date(Date.now() - (i * 7000000)).toISOString(),
-  })),
-];
 
 export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackToHome }) => {
   const [pin, setPin] = useState('');
@@ -93,8 +27,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   });
   const [authError, setAuthError] = useState(false);
 
-  const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
-  const [includeDemoData, setIncludeDemoData] = useState(true);
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -114,12 +47,10 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     setIsAuthenticated(false);
   };
 
-  // Raw events combined
+  // Pure real events from local storage (NO DUMMY / MOCK DATA)
   const events = useMemo(() => {
-    const local = getLocalAnalyticsEvents();
-    if (!includeDemoData) return local;
-    return [...local, ...MOCK_BASELINE_EVENTS];
-  }, [includeDemoData, refreshKey]);
+    return getLocalAnalyticsEvents();
+  }, [refreshKey]);
 
   // Filter events by time range
   const filteredEvents = useMemo(() => {
@@ -132,7 +63,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     return events.filter((ev) => new Date(ev.timestamp).getTime() >= cutoff);
   }, [events, timeRange]);
 
-  // High level KPIs
+  // High level KPIs (100% Real Data, starts at 0)
   const kpis = useMemo(() => {
     const pageViews = filteredEvents.filter((e) => e.eventName === 'page_view').length;
     const toolStarts = filteredEvents.filter((e) => e.eventName === 'tool_started').length;
@@ -203,9 +134,13 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     }).sort((a, b) => b.starts - a.starts);
   }, [filteredEvents]);
 
-  // Conversion Funnel Data
+  // Conversion Funnel Data (starts from 0)
   const funnelSteps = [
-    { label: '1. Pengunjung Unik (Page Views)', count: kpis.pageViews, pct: 100 },
+    { 
+      label: '1. Pengunjung Unik (Page Views)', 
+      count: kpis.pageViews, 
+      pct: kpis.pageViews > 0 ? 100 : 0 
+    },
     {
       label: '2. Mulai Assessment (Tool Started)',
       count: kpis.toolStarts,
@@ -242,7 +177,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         </div>
         <h2 className="text-xl font-bold text-foreground">Dashboard Analytics Pemilik</h2>
         <p className="text-xs text-muted mt-1.5 mb-6">
-          Masukkan PIN keamanan untuk melihat data performa traffic dan funnel konversi.
+          Masukkan PIN keamanan untuk melihat data performa traffic dan funnel konversi riil.
         </p>
 
         <form onSubmit={handleLogin} className="space-y-4 max-w-xs mx-auto">
@@ -298,12 +233,12 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
             <h1 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
               Owner Analytics &amp; Funnel Hub
             </h1>
-            <span className="text-[10px] font-bold text-teal-brand bg-teal-brand/10 px-2 py-0.5 rounded-full">
-              Live
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+              Real Data (100% Murni)
             </span>
           </div>
           <p className="text-xs text-muted mt-0.5">
-            Analisa traffic, retensi pengerjaan tools, dan rasio konversi konsultasi WhatsApp.
+            Semua angka di bawah adalah hasil rekaman riil aktivitas pengunjung, tanpa data dummy.
           </p>
         </div>
 
@@ -319,15 +254,16 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
           <button
             onClick={() => {
-              if (window.confirm('Hapus log analytics lokal di browser ini?')) {
+              if (window.confirm('Reset semua log analitik lokal menjadi 0?')) {
                 clearLocalAnalyticsEvents();
                 setRefreshKey((k) => k + 1);
               }
             }}
-            title="Clear Local Cache"
-            className="p-2 rounded-card border border-border hover:bg-rose-50 hover:text-rose-600 text-muted transition-colors"
+            title="Reset Analitik ke 0"
+            className="p-2 rounded-card border border-border hover:bg-rose-50 hover:text-rose-600 text-muted transition-colors flex items-center gap-1 text-xs"
           >
             <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Reset ke 0</span>
           </button>
 
           <button
@@ -361,16 +297,24 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-muted cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={includeDemoData}
-            onChange={(e) => setIncludeDemoData(e.target.checked)}
-            className="rounded border-border text-teal-brand focus:ring-teal-brand"
-          />
-          <span>Gabungkan baseline data simulasi</span>
-        </label>
+        <div className="text-[11px] text-muted flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+          <span>Log Perangkat: {events.length} event tersimpan</span>
+        </div>
       </div>
+
+      {/* ZERO DATA NOTIFICATION IF EMPTY */}
+      {filteredEvents.length === 0 && (
+        <div className="p-4 rounded-card bg-section/70 border border-border text-xs text-muted flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-teal-brand shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-foreground block">
+              Data masih kosong (0)
+            </span>
+            Belum ada kunjungan atau interaksi pada rentang waktu ini. Angka akan otomatis bertambah secara real-time saat ada pengunjung membuka halaman, mencoba kalkulator, atau mengklik tombol WhatsApp.
+          </div>
+        </div>
+      )}
 
       {/* KPI CARDS (4 CARDS) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -430,7 +374,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
               <div className="h-2 w-full bg-section rounded-full overflow-hidden">
                 <div
                   className="h-full bg-teal-brand transition-all duration-300"
-                  style={{ width: `${Math.min(100, Math.max(4, step.pct))}%` }}
+                  style={{ width: `${step.pct > 0 ? Math.min(100, Math.max(4, step.pct)) : 0}%` }}
                 />
               </div>
             </div>
@@ -494,30 +438,36 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         </h3>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="border-b border-border/80 text-muted uppercase font-bold text-[10px]">
-              <tr>
-                <th className="py-2.5 pr-4">Channel (Source)</th>
-                <th className="py-2.5 px-3 text-center">Visitors</th>
-                <th className="py-2.5 px-3 text-center">Tool Starts</th>
-                <th className="py-2.5 pl-3 text-right">WA Clicks</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {trafficSources.map(([src, stat]) => (
-                <tr key={src} className="hover:bg-section/40">
-                  <td className="py-2.5 pr-4 font-semibold text-foreground uppercase tracking-wide">
-                    {src}
-                  </td>
-                  <td className="py-2.5 px-3 text-center text-muted">{stat.visitors}</td>
-                  <td className="py-2.5 px-3 text-center text-muted">{stat.starts}</td>
-                  <td className="py-2.5 pl-3 text-right font-bold text-teal-brand">
-                    {stat.waClicks > 0 ? `💬 ${stat.waClicks}` : '0'}
-                  </td>
+          {trafficSources.length === 0 ? (
+            <div className="py-6 text-center text-xs text-muted">
+              Belum ada data traffic kunjungan tercatat.
+            </div>
+          ) : (
+            <table className="w-full text-xs text-left">
+              <thead className="border-b border-border/80 text-muted uppercase font-bold text-[10px]">
+                <tr>
+                  <th className="py-2.5 pr-4">Channel (Source)</th>
+                  <th className="py-2.5 px-3 text-center">Visitors</th>
+                  <th className="py-2.5 px-3 text-center">Tool Starts</th>
+                  <th className="py-2.5 pl-3 text-right">WA Clicks</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {trafficSources.map(([src, stat]) => (
+                  <tr key={src} className="hover:bg-section/40">
+                    <td className="py-2.5 pr-4 font-semibold text-foreground uppercase tracking-wide">
+                      {src}
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-muted">{stat.visitors}</td>
+                    <td className="py-2.5 px-3 text-center text-muted">{stat.starts}</td>
+                    <td className="py-2.5 pl-3 text-right font-bold text-teal-brand">
+                      {stat.waClicks > 0 ? `💬 ${stat.waClicks}` : '0'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -528,14 +478,14 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           <span>PostHog Cloud Setup (Opsional)</span>
         </div>
         <p>
-          Situs ini sudah dilengkapi integrasi otomatis PostHog. Cukup tambahkan environment variable di Vercel:
+          Situs ini sudah siap terhubung ke PostHog Cloud. Cukup tambahkan environment variable di dashboard Vercel project:
         </p>
         <div className="p-2 rounded bg-white border border-teal-brand/20 font-mono text-[11px] text-teal-900">
           VITE_POSTHOG_KEY=phc_your_key_here<br />
           VITE_POSTHOG_HOST=https://us.i.posthog.com
         </div>
         <p className="text-[11px] text-teal-800">
-          Semua event akan otomatis terkirim ke PostHog dashboard secara terenkripsi dan bebas dari PII data sensitif.
+          Semua event akan otomatis terkirim ke PostHog dashboard secara terenkripsi dan bebas dari data sensitif (PII).
         </p>
       </div>
     </div>
