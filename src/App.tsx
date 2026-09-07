@@ -34,11 +34,36 @@ import { FamilyReadinessRunner } from './components/tools/runners/FamilyReadines
 import { HealthChecklistRunner } from './components/tools/runners/HealthChecklistRunner';
 import { ProtectionGapRunner } from './components/tools/runners/ProtectionGapRunner';
 
+function getInitialRoute(): { view: 'home' | 'tools' | 'about' | 'education' | 'admin'; tool: ActiveToolId | null } {
+  if (typeof window === 'undefined') return { view: 'home', tool: null };
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const adminParam = params.get('admin');
+    const toolParam = params.get('tool');
+    const eduParam = params.get('edu');
+    const path = window.location.pathname;
+
+    if (adminParam === 'analytics' || path === '/admin' || path === '/admin/analytics') {
+      return { view: 'admin', tool: null };
+    }
+    if (toolParam) {
+      return { view: 'home', tool: toolParam as ActiveToolId };
+    }
+    if (eduParam === 'financial-protection') {
+      return { view: 'education', tool: null };
+    }
+  } catch (err) {
+    console.warn('[App] Route resolution error:', err);
+  }
+  return { view: 'home', tool: null };
+}
+
 export function App() {
+  const [initialRoute] = useState(() => getInitialRoute());
   const [profile, setProfile] = useState<UserProfile>(getStoredProfile());
   const [results, setResults] = useState<StoredResults>(getStoredResults());
-  const [activeTool, setActiveTool] = useState<ActiveToolId | null>(null);
-  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'about' | 'education' | 'admin'>('home');
+  const [activeTool, setActiveTool] = useState<ActiveToolId | null>(initialRoute.tool);
+  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'about' | 'education' | 'admin'>(initialRoute.view);
   const [legalModal, setLegalModal] = useState<'privacy' | 'disclaimer' | null>(null);
 
   // Sync profile & results updates
@@ -53,28 +78,6 @@ export function App() {
       window.removeEventListener('profile_updated', handleProfileUpdate);
       window.removeEventListener('results_updated', handleResultsUpdate);
     };
-  }, []);
-
-  // Check URL query parameters on mount (deep links)
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const adminParam = params.get('admin');
-      const toolParam = params.get('tool');
-      const eduParam = params.get('edu');
-      const path = window.location.pathname;
-
-      if (adminParam === 'analytics' || path === '/admin' || path === '/admin/analytics') {
-        setCurrentView('admin');
-        analytics.page('admin_analytics');
-      } else if (toolParam) {
-        setActiveTool(toolParam as ActiveToolId);
-      } else if (eduParam === 'financial-protection') {
-        setCurrentView('education');
-      }
-    } catch (err) {
-      console.warn('[App] Route resolution error:', err);
-    }
   }, []);
 
   // Global event listeners for cross-component navigation bridges

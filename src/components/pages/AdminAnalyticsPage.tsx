@@ -65,7 +65,23 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
   // High level KPIs (100% Real Data, starts at 0)
   const kpis = useMemo(() => {
-    const pageViews = filteredEvents.filter((e) => e.eventName === 'page_view').length;
+    // Exclude internal admin dashboard views from public metrics
+    const publicPageViews = filteredEvents.filter(
+      (e) => e.eventName === 'page_view' && 
+             e.properties.page !== 'admin_analytics' && 
+             e.properties.page !== 'admin'
+    );
+
+    // Unique visitors deduplicated by visitor_id or session_id
+    const uniqueVisitorIds = new Set(
+      publicPageViews
+        .map((e) => e.properties.visitor_id || e.properties.session_id)
+        .filter(Boolean)
+    );
+
+    const uniqueVisitors = uniqueVisitorIds.size;
+    const pageViews = publicPageViews.length;
+
     const toolStarts = filteredEvents.filter((e) => e.eventName === 'tool_started').length;
     const toolCompletions = filteredEvents.filter((e) => e.eventName === 'tool_completed').length;
     const waClicks = filteredEvents.filter((e) => e.eventName === 'whatsapp_clicked').length;
@@ -75,9 +91,10 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     const protectionOpens = filteredEvents.filter((e) => e.eventName === 'protection_gap_opened').length;
 
     const completionRate = toolStarts > 0 ? Math.round((toolCompletions / toolStarts) * 100) : 0;
-    const waConversionRate = pageViews > 0 ? ((waClicks / pageViews) * 100).toFixed(1) : '0.0';
+    const waConversionRate = uniqueVisitors > 0 ? ((waClicks / uniqueVisitors) * 100).toFixed(1) : '0.0';
 
     return {
+      uniqueVisitors,
       pageViews,
       toolStarts,
       toolCompletions,
@@ -94,6 +111,9 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     const map: Record<string, { visitors: number; starts: number; waClicks: number }> = {};
 
     filteredEvents.forEach((ev) => {
+      if (ev.eventName === 'page_view' && (ev.properties.page === 'admin_analytics' || ev.properties.page === 'admin')) {
+        return;
+      }
       const src = (ev.properties.first_touch_source || 'direct').toLowerCase();
       if (!map[src]) {
         map[src] = { visitors: 0, starts: 0, waClicks: 0 };
@@ -137,14 +157,14 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   // Conversion Funnel Data (starts from 0)
   const funnelSteps = [
     { 
-      label: '1. Pengunjung Unik (Page Views)', 
-      count: kpis.pageViews, 
-      pct: kpis.pageViews > 0 ? 100 : 0 
+      label: '1. Pengunjung Unik (Unique Visitors)', 
+      count: kpis.uniqueVisitors, 
+      pct: kpis.uniqueVisitors > 0 ? 100 : 0 
     },
     {
       label: '2. Mulai Assessment (Tool Started)',
       count: kpis.toolStarts,
-      pct: kpis.pageViews > 0 ? Math.round((kpis.toolStarts / kpis.pageViews) * 100) : 0,
+      pct: kpis.uniqueVisitors > 0 ? Math.round((kpis.toolStarts / kpis.uniqueVisitors) * 100) : 0,
     },
     {
       label: '3. Menyelesaikan Hasil (Completed)',
@@ -323,8 +343,8 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
             <span className="text-[11px] font-bold uppercase tracking-wider">Pengunjung</span>
             <Users className="w-4 h-4 text-teal-brand" />
           </div>
-          <div className="text-2xl font-extrabold text-foreground">{kpis.pageViews}</div>
-          <div className="text-[10px] text-muted mt-0.5">Total Page Views</div>
+          <div className="text-2xl font-extrabold text-foreground">{kpis.uniqueVisitors}</div>
+          <div className="text-[10px] text-muted mt-0.5">{kpis.pageViews} Total Page Views</div>
         </div>
 
         <div className="p-4 rounded-card bg-card border border-border shadow-soft">

@@ -42,6 +42,40 @@ export interface StoredLocalEvent {
 }
 
 // ==========================================
+// VISITOR & SESSION IDENTIFIER ENGINE
+// ==========================================
+const STORAGE_VISITOR_ID = 'agy_visitor_id';
+const STORAGE_SESSION_ID = 'agy_session_id';
+
+export function getOrCreateVisitorId(): string {
+  if (typeof window === 'undefined') return 'server';
+  try {
+    let vid = localStorage.getItem(STORAGE_VISITOR_ID);
+    if (!vid) {
+      vid = 'v_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      localStorage.setItem(STORAGE_VISITOR_ID, vid);
+    }
+    return vid;
+  } catch {
+    return 'anonymous';
+  }
+}
+
+export function getOrCreateSessionId(): string {
+  if (typeof window === 'undefined') return 'server';
+  try {
+    let sid = sessionStorage.getItem(STORAGE_SESSION_ID);
+    if (!sid) {
+      sid = 's_' + Math.random().toString(36).substring(2, 10);
+      sessionStorage.setItem(STORAGE_SESSION_ID, sid);
+    }
+    return sid;
+  } catch {
+    return 'default_session';
+  }
+}
+
+// ==========================================
 // SENSITIVE KEYS DENYLIST (STRICT PRIVACY)
 // ==========================================
 const SENSITIVE_KEY_PATTERNS = [
@@ -193,6 +227,8 @@ export function clearLocalAnalyticsEvents(): void {
 class AnalyticsClient {
   private isPosthogInitialized = false;
   private isDebug = false;
+  private lastPageName: string = '';
+  private lastPageTime: number = 0;
 
   constructor() {
     this.init();
@@ -203,6 +239,10 @@ class AnalyticsClient {
 
     // Capture UTM on boot
     captureUtmFromUrl();
+
+    // Ensure session and visitor identifiers exist
+    getOrCreateVisitorId();
+    getOrCreateSessionId();
 
     // Check debug flag from Vite env or localStorage
     const debugEnv = import.meta.env.VITE_ANALYTICS_DEBUG;
@@ -240,6 +280,8 @@ class AnalyticsClient {
 
     const mergedProps = {
       ...safeProps,
+      visitor_id: getOrCreateVisitorId(),
+      session_id: getOrCreateSessionId(),
       first_touch_source: firstTouch.utm_source || 'direct',
       first_touch_medium: firstTouch.utm_medium,
       first_touch_campaign: firstTouch.utm_campaign,
@@ -269,6 +311,14 @@ class AnalyticsClient {
   }
 
   public page(pageName: string, properties?: Record<string, any>) {
+    const now = Date.now();
+    // Guard against duplicate page view calls within 1 second (e.g. React StrictMode or immediate remount)
+    if (this.lastPageName === pageName && now - this.lastPageTime < 1000) {
+      return;
+    }
+    this.lastPageName = pageName;
+    this.lastPageTime = now;
+
     this.track('page_view', {
       page: pageName,
       path: typeof window !== 'undefined' ? window.location.pathname : '/',
