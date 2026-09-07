@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Check, Sparkles } from 'lucide-react';
+import { analytics } from '../../utils/analytics';
 
 export interface QuestionOption {
   label: string;
@@ -39,6 +40,18 @@ export const QuestionRunner: React.FC<QuestionRunnerProps> = ({
   const [animatingValue, setAnimatingValue] = useState<string | null>(null);
 
   const currentQ = questions[currentStepIndex];
+
+  useEffect(() => {
+    if (currentQ) {
+      analytics.track('tool_question_viewed', {
+        tool_name: toolTitle,
+        step_index: currentStepIndex + 1,
+        total_steps: questions.length,
+        question_id: currentQ.id,
+      });
+    }
+  }, [currentStepIndex, currentQ?.id, toolTitle, questions.length]);
+
   if (!currentQ) return null;
 
   const totalQuestions = questions.length;
@@ -47,10 +60,34 @@ export const QuestionRunner: React.FC<QuestionRunnerProps> = ({
 
   const handleChoose = (val: string) => {
     setAnimatingValue(val);
+    analytics.track('tool_question_answered', {
+      tool_name: toolTitle,
+      step_index: currentStepIndex + 1,
+      total_steps: totalQuestions,
+      question_id: currentQ.id,
+      // Strict privacy: Do not log val (the raw answer)
+    });
     setTimeout(() => {
       onSelectOption(currentQ.id, val);
       setAnimatingValue(null);
     }, 200);
+  };
+
+  const handleCancelClick = () => {
+    analytics.track('tool_abandoned', {
+      tool_name: toolTitle,
+      drop_off_step: currentStepIndex + 1,
+      total_steps: totalQuestions,
+    });
+    onCancel();
+  };
+
+  const handleBackClick = () => {
+    analytics.track('tool_question_back', {
+      tool_name: toolTitle,
+      step_index: currentStepIndex + 1,
+    });
+    onBack();
   };
 
   return (
@@ -58,7 +95,7 @@ export const QuestionRunner: React.FC<QuestionRunnerProps> = ({
       {/* Top Header */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <button
-          onClick={currentStepIndex === 0 ? onCancel : onBack}
+          onClick={currentStepIndex === 0 ? handleCancelClick : handleBackClick}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground py-1.5 px-3 rounded-full hover:bg-section transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />

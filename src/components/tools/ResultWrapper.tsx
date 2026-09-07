@@ -14,6 +14,8 @@ import { getWhatsAppLink } from '../../utils/formatters';
 import { ShareCardModal } from './ShareCardModal';
 import { LeadCaptureModal } from './LeadCaptureModal';
 import { ActiveToolId } from '../../types/profile';
+import { RiskEducationBridge } from './RiskEducationBridge';
+import { analytics } from '../../utils/analytics';
 
 interface PillarScore {
   name: string;
@@ -40,6 +42,9 @@ interface ResultWrapperProps {
   onSelectRecommendedTool?: (toolId: ActiveToolId) => void;
   onRetake: () => void;
   contextWaKey?: 'life-readiness' | 'financial-health' | 'emergency' | 'lifestyle' | 'medical' | 'family';
+  onNavigateToEducation?: () => void;
+  onNavigateToProtectionGap?: () => void;
+  hideRiskBridge?: boolean;
 }
 
 export const ResultWrapper: React.FC<ResultWrapperProps> = ({
@@ -57,11 +62,32 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
   onSelectRecommendedTool,
   onRetake,
   contextWaKey = 'life-readiness',
+  onNavigateToEducation,
+  onNavigateToProtectionGap,
+  hideRiskBridge = false,
 }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
 
   const waLink = getWhatsAppLink(contextWaKey);
+
+  const handleWaClick = () => {
+    analytics.track('whatsapp_clicked', {
+      source_tool: toolTitle,
+      context_key: contextWaKey,
+      button_location: 'result_card_footer',
+    });
+  };
+
+  const handleOpenShare = () => {
+    analytics.track('share_modal_opened', { tool_title: toolTitle });
+    setShowShareModal(true);
+  };
+
+  const handleOpenSave = () => {
+    analytics.track('lead_capture_saved', { tool_title: toolTitle, action: 'open_modal' });
+    setShowLeadModal(true);
+  };
 
   return (
     <div className="max-w-[680px] mx-auto px-4 py-8 animate-in fade-in duration-300">
@@ -77,7 +103,7 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowLeadModal(true)}
+            onClick={handleOpenSave}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-brand hover:bg-teal-brand/10 py-1.5 px-3 rounded-full border border-teal-brand/30 transition-colors"
           >
             <Bookmark className="w-3.5 h-3.5" />
@@ -85,7 +111,7 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
           </button>
           
           <button
-            onClick={() => setShowShareModal(true)}
+            onClick={handleOpenShare}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white hover:bg-section py-1.5 px-3 rounded-full border border-border shadow-soft transition-colors"
           >
             <Share2 className="w-3.5 h-3.5 text-muted" />
@@ -171,6 +197,15 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
             </div>
           </div>
         )}
+
+        {/* LAYER 5: NEUTRAL RISK EDUCATION BRIDGE */}
+        {!hideRiskBridge && (
+          <RiskEducationBridge
+            toolContext={toolTitle}
+            onNavigateToEducation={onNavigateToEducation}
+            onNavigateToProtectionGap={onNavigateToProtectionGap}
+          />
+        )}
       </div>
 
       {/* SMART CROSS-TOOL NEXT STEP */}
@@ -210,6 +245,7 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
           href={waLink}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={handleWaClick}
           className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold py-2.5 px-5 rounded-btn shadow-soft transition-colors"
         >
           <span>💬 Tanya Robert via WhatsApp</span>

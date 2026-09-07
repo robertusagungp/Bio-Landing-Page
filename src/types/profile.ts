@@ -216,6 +216,28 @@ export interface HealthChecklistResult {
   disclaimer: string;
 }
 
+export interface ProtectionGapResult {
+  overallScore: number;
+  status: 'safe' | 'moderate_gap' | 'high_gap' | 'critical_gap';
+  statusLabel: string;
+  summary: string;
+  whyExplanation: string;
+  vulnerabilityPillars: {
+    name: string;
+    level: 'Aman' | 'Waspada' | 'Kritis';
+    score: number;
+    description: string;
+  }[];
+  recommendations: {
+    priority: 'high' | 'medium' | 'low';
+    title: string;
+    description: string;
+    suitableVehicle: string;
+  }[];
+  isAdequatelyProtected: boolean;
+  neutralNote: string;
+}
+
 export type ActiveToolId = 
   | 'life-readiness' 
   | 'lifestyle-age' 
@@ -224,7 +246,8 @@ export type ActiveToolId =
   | 'emergency-checker' 
   | 'medical-simulator' 
   | 'family-readiness' 
-  | 'health-checklist';
+  | 'health-checklist'
+  | 'protection-gap';
 
 export interface StoredResults {
   lifeReadiness?: LifeReadinessResult;
@@ -235,5 +258,6 @@ export interface StoredResults {
   medicalScenario?: MedicalScenarioResult;
   familyReadiness?: FamilyReadinessResult;
   healthChecklist?: HealthChecklistResult;
+  protectionGap?: ProtectionGapResult;
   lastCompletedTool?: ActiveToolId;
 }

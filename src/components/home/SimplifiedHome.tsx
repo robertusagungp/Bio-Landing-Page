@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowRight, ChevronRight, MessageCircle } from 'lucide-react';
 import { ActiveToolId, LifeReadinessResult } from '../../types/profile';
 import { getWhatsAppLink } from '../../utils/formatters';
+import { analytics } from '../../utils/analytics';
 
 interface SimplifiedHomeProps {
   onStartLifeScore: () => void;
@@ -21,6 +22,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
   onRetakeLifeScore,
 }) => {
   const waUrl = getWhatsAppLink('default');
+
+  useEffect(() => {
+    analytics.page('home');
+  }, []);
 
   return (
     <div className="max-w-[680px] mx-auto px-4 pt-4 sm:pt-10 pb-16 space-y-12 sm:space-y-16">
@@ -94,7 +99,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
 
           <div className="mt-6">
             <button
-              onClick={onStartLifeScore}
+              onClick={() => {
+                analytics.track('life_score_cta_clicked', { has_saved_score: !!savedLifeScore });
+                onStartLifeScore();
+              }}
               className="w-full sm:w-auto min-w-[240px] bg-teal-brand hover:bg-teal-light active:scale-[0.98] text-white font-bold py-3.5 px-8 rounded-btn shadow-soft text-sm transition-all inline-flex items-center justify-center gap-2 group"
             >
               <span>{savedLifeScore ? 'Buka Hasil Saya' : 'Mulai Sekarang'}</span>
@@ -113,7 +121,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
         <div className="space-y-2.5">
           {/* Card 1: Lifestyle Age */}
           <button
-            onClick={() => onSelectTool('lifestyle-age')}
+            onClick={() => {
+              analytics.track('tool_started', { tool_name: 'lifestyle_age', entry_point: 'curiosity_card' });
+              onSelectTool('lifestyle-age');
+            }}
             className="w-full text-left p-4 sm:p-5 rounded-card bg-card hover:bg-white border border-border shadow-soft hover:border-teal-brand/40 active:scale-[0.99] transition-all flex items-center justify-between group"
           >
             <div className="flex items-center gap-3.5 pr-2">
@@ -138,7 +149,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
 
           {/* Card 2: Emergency Fund Checker */}
           <button
-            onClick={() => onSelectTool('emergency-checker')}
+            onClick={() => {
+              analytics.track('tool_started', { tool_name: 'emergency_checker', entry_point: 'curiosity_card' });
+              onSelectTool('emergency-checker');
+            }}
             className="w-full text-left p-4 sm:p-5 rounded-card bg-card hover:bg-white border border-border shadow-soft hover:border-teal-brand/40 active:scale-[0.99] transition-all flex items-center justify-between group"
           >
             <div className="flex items-center gap-3.5 pr-2">
@@ -163,7 +177,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
 
           {/* Card 3: Medical Cost Scenario */}
           <button
-            onClick={() => onSelectTool('medical-simulator')}
+            onClick={() => {
+              analytics.track('tool_started', { tool_name: 'medical_simulator', entry_point: 'curiosity_card' });
+              onSelectTool('medical-simulator');
+            }}
             className="w-full text-left p-4 sm:p-5 rounded-card bg-card hover:bg-white border border-border shadow-soft hover:border-teal-brand/40 active:scale-[0.99] transition-all flex items-center justify-between group"
           >
             <div className="flex items-center gap-3.5 pr-2">
@@ -190,7 +207,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
         {/* 5. VIEW ALL TOOLS LINK */}
         <div className="pt-2 text-center sm:text-left">
           <button
-            onClick={onNavigateToTools}
+            onClick={() => {
+              analytics.track('catalog_tool_clicked', { source: 'homepage_link' });
+              onNavigateToTools();
+            }}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-brand hover:text-teal-dark transition-colors py-1"
           >
             <span>Lihat semua tools</span>
@@ -209,7 +229,10 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
         </p>
         <div className="mt-3">
           <button
-            onClick={onNavigateToAbout}
+            onClick={() => {
+              analytics.track('about_viewed', { source: 'home_link' });
+              onNavigateToAbout();
+            }}
             className="inline-flex items-center gap-1 text-xs font-bold text-teal-brand hover:underline"
           >
             <span>Tentang Robert</span>
@@ -230,6 +253,9 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
           href={waUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => {
+            analytics.track('whatsapp_clicked', { source_tool: 'homepage', button_location: 'home_bottom' });
+          }}
           className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold py-2.5 px-5 rounded-btn shadow-soft transition-colors"
         >
           <MessageCircle className="w-4 h-4 fill-white/20" />

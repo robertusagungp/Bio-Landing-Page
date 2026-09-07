@@ -9,6 +9,7 @@ import {
   getStoredResults, 
   updateStoredProfile 
 } from './utils/storage';
+import { analytics } from './utils/analytics';
 
 // Minimal layout components
 import { Navbar } from './components/layout/Navbar';
@@ -18,9 +19,11 @@ import { Footer } from './components/layout/Footer';
 import { SimplifiedHome } from './components/home/SimplifiedHome';
 import { ToolsCatalogPage } from './components/pages/ToolsCatalogPage';
 import { AboutRobertPage } from './components/pages/AboutRobertPage';
+import { FinancialProtectionPage } from './components/pages/FinancialProtectionPage';
+import { AdminAnalyticsPage } from './components/pages/AdminAnalyticsPage';
 import { LegalModal } from './components/pages/LegalModal';
 
-// Rich Tool Runners (100% Preserved)
+// Rich Tool Runners (100% Preserved + Protection Gap)
 import { LifeReadinessRunner } from './components/tools/runners/LifeReadinessRunner';
 import { LifestyleAgeRunner } from './components/tools/runners/LifestyleAgeRunner';
 import { WellnessRunner } from './components/tools/runners/WellnessRunner';
@@ -29,14 +32,16 @@ import { EmergencyCheckerRunner } from './components/tools/runners/EmergencyChec
 import { MedicalSimulatorRunner } from './components/tools/runners/MedicalSimulatorRunner';
 import { FamilyReadinessRunner } from './components/tools/runners/FamilyReadinessRunner';
 import { HealthChecklistRunner } from './components/tools/runners/HealthChecklistRunner';
+import { ProtectionGapRunner } from './components/tools/runners/ProtectionGapRunner';
 
 export function App() {
   const [profile, setProfile] = useState<UserProfile>(getStoredProfile());
   const [results, setResults] = useState<StoredResults>(getStoredResults());
   const [activeTool, setActiveTool] = useState<ActiveToolId | null>(null);
-  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'about'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'about' | 'education' | 'admin'>('home');
   const [legalModal, setLegalModal] = useState<'privacy' | 'disclaimer' | null>(null);
 
+  // Sync profile & results updates
   useEffect(() => {
     const handleProfileUpdate = () => setProfile(getStoredProfile());
     const handleResultsUpdate = () => setResults(getStoredResults());
@@ -47,6 +52,54 @@ export function App() {
     return () => {
       window.removeEventListener('profile_updated', handleProfileUpdate);
       window.removeEventListener('results_updated', handleResultsUpdate);
+    };
+  }, []);
+
+  // Check URL query parameters on mount (deep links)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const adminParam = params.get('admin');
+      const toolParam = params.get('tool');
+      const eduParam = params.get('edu');
+      const path = window.location.pathname;
+
+      if (adminParam === 'analytics' || path === '/admin' || path === '/admin/analytics') {
+        setCurrentView('admin');
+        analytics.page('admin_analytics');
+      } else if (toolParam) {
+        setActiveTool(toolParam as ActiveToolId);
+      } else if (eduParam === 'financial-protection') {
+        setCurrentView('education');
+      }
+    } catch (err) {
+      console.warn('[App] Route resolution error:', err);
+    }
+  }, []);
+
+  // Global event listeners for cross-component navigation bridges
+  useEffect(() => {
+    const handleViewChange = (e: any) => {
+      if (e.detail) {
+        setActiveTool(null);
+        setCurrentView(e.detail);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    const handleToolChange = (e: any) => {
+      if (e.detail) {
+        setActiveTool(e.detail);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    window.addEventListener('agy_navigate_view', handleViewChange);
+    window.addEventListener('agy_navigate_tool', handleToolChange);
+
+    return () => {
+      window.removeEventListener('agy_navigate_view', handleViewChange);
+      window.removeEventListener('agy_navigate_tool', handleToolChange);
     };
   }, []);
 
@@ -74,7 +127,7 @@ export function App() {
       {/* Main Content Area */}
       <main className="flex-1">
         {activeTool ? (
-          /* ACTIVE INTERACTIVE TOOL VIEW (Full depth & calculation intact) */
+          /* ACTIVE INTERACTIVE TOOL VIEW */
           <div className="py-2">
             {activeTool === 'life-readiness' && (
               <LifeReadinessRunner
@@ -140,6 +193,19 @@ export function App() {
                 onClose={handleCloseTool}
               />
             )}
+            {activeTool === 'protection-gap' && (
+              <ProtectionGapRunner
+                initialProfile={profile}
+                savedResult={results.protectionGap}
+                onNavigateToTool={handleSelectTool}
+                onNavigateToEducation={() => {
+                  setActiveTool(null);
+                  setCurrentView('education');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onClose={handleCloseTool}
+              />
+            )}
           </div>
         ) : (
           /* DEDICATED VIEWS */
@@ -159,6 +225,10 @@ export function App() {
               <ToolsCatalogPage
                 onSelectTool={handleSelectTool}
                 onBackToHome={() => handleNavigation('home')}
+                onNavigateToEducation={() => {
+                  setCurrentView('education');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
                 results={results}
               />
             )}
@@ -168,13 +238,38 @@ export function App() {
                 onBackToHome={() => handleNavigation('home')}
               />
             )}
+
+            {currentView === 'education' && (
+              <FinancialProtectionPage
+                onBack={() => {
+                  setCurrentView('tools');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onStartProtectionGap={() => handleSelectTool('protection-gap')}
+              />
+            )}
+
+            {currentView === 'admin' && (
+              <AdminAnalyticsPage
+                onBackToHome={() => {
+                  setCurrentView('home');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            )}
           </>
         )}
       </main>
 
       {/* Minimal Clean Footer */}
-      {!activeTool && (
-        <Footer onOpenLegal={(type) => setLegalModal(type)} />
+      {!activeTool && currentView !== 'admin' && (
+        <Footer 
+          onOpenLegal={(type) => setLegalModal(type)}
+          onOpenAdmin={() => {
+            setCurrentView('admin');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
       )}
 
       {/* Privacy / Disclaimer Modal */}

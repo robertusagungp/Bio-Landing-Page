@@ -1,16 +1,19 @@
 import React from 'react';
-import { ArrowLeft, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, ArrowRight, BookOpen } from 'lucide-react';
 import { ActiveToolId, StoredResults } from '../../types/profile';
+import { analytics } from '../../utils/analytics';
 
 interface ToolsCatalogPageProps {
   onSelectTool: (toolId: ActiveToolId) => void;
   onBackToHome: () => void;
+  onNavigateToEducation?: () => void;
   results: StoredResults;
 }
 
 export const ToolsCatalogPage: React.FC<ToolsCatalogPageProps> = ({
   onSelectTool,
   onBackToHome,
+  onNavigateToEducation,
   results,
 }) => {
   const toolCategories = [
@@ -102,6 +105,15 @@ export const ToolsCatalogPage: React.FC<ToolsCatalogPageProps> = ({
           completed: !!results.familyReadiness,
           scorePreview: results.familyReadiness ? `${results.familyReadiness.overallScore}/100` : null,
         },
+        {
+          id: 'protection-gap' as ActiveToolId,
+          icon: '🛡️',
+          title: 'Protection Gap Checker',
+          desc: 'Evaluasi objektif apakah kamu sudah cukup terlindungi atau memiliki celah risiko finansial raksasa.',
+          time: '±90 detik',
+          completed: !!results.protectionGap,
+          scorePreview: results.protectionGap ? `${results.protectionGap.overallScore}/100` : null,
+        },
       ],
     },
   ];
@@ -140,7 +152,10 @@ export const ToolsCatalogPage: React.FC<ToolsCatalogPageProps> = ({
               {group.tools.map((t) => (
                 <button
                   key={t.id}
-                  onClick={() => onSelectTool(t.id)}
+                  onClick={() => {
+                    analytics.track('catalog_tool_clicked', { tool_id: t.id, tool_title: t.title });
+                    onSelectTool(t.id);
+                  }}
                   className="w-full text-left p-4 sm:p-4.5 rounded-card bg-card hover:bg-white border border-border shadow-soft hover:border-teal-brand/40 active:scale-[0.99] transition-all flex items-center justify-between group"
                 >
                   <div className="flex items-start gap-3.5 pr-2">
@@ -176,6 +191,34 @@ export const ToolsCatalogPage: React.FC<ToolsCatalogPageProps> = ({
           </div>
         ))}
       </div>
+
+      {/* EDUCATIONAL BRIDGE AT CATALOG FOOTER */}
+      {onNavigateToEducation && (
+        <div className="pt-4 border-t border-border/80">
+          <button
+            onClick={() => {
+              analytics.track('financial_protection_viewed', { source: 'tools_catalog_footer' });
+              onNavigateToEducation();
+            }}
+            className="w-full text-left p-5 rounded-card-lg bg-teal-brand/5 hover:bg-teal-brand/10 border border-teal-brand/20 transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-start gap-3.5 pr-2">
+              <div className="w-10 h-10 rounded-full bg-teal-brand/10 text-teal-brand flex items-center justify-center shrink-0 mt-0.5">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-foreground group-hover:text-teal-brand transition-colors">
+                  Kapan Seseorang Sebenarnya Membutuhkan Asuransi?
+                </h4>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">
+                  Pelajari panduan objektif tentang skala risiko kecil, menengah, dan katastropik tanpa jargon rumit.
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-teal-brand group-hover:translate-x-1 transition-transform shrink-0" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
