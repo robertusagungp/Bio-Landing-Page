@@ -56,6 +56,11 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
   const [copiedBioLink, setCopiedBioLink] = useState<boolean>(false);
+  const [resetCutoff, setResetCutoff] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = localStorage.getItem('agy_analytics_reset_cutoff');
+    return stored ? parseInt(stored, 10) : 0;
+  });
 
   const projectKey = getPostHogProjectKey();
   const instagramBioUrl = 'https://bio-landing-page-seven.vercel.app/?utm_source=instagram&utm_medium=bio';
@@ -151,16 +156,16 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     return getLocalAnalyticsEvents();
   }, [cloudEvents, refreshKey]);
 
-  // Filter events by time range
+  // Filter events by time range and reset cutoff
   const filteredEvents = useMemo(() => {
     const now = Date.now();
-    let cutoff = 0;
-    if (timeRange === 'today') cutoff = now - 24 * 3600 * 1000;
-    else if (timeRange === '7d') cutoff = now - 7 * 24 * 3600 * 1000;
-    else if (timeRange === '30d') cutoff = now - 30 * 24 * 3600 * 1000;
+    let cutoff = resetCutoff;
+    if (timeRange === 'today') cutoff = Math.max(cutoff, now - 24 * 3600 * 1000);
+    else if (timeRange === '7d') cutoff = Math.max(cutoff, now - 7 * 24 * 3600 * 1000);
+    else if (timeRange === '30d') cutoff = Math.max(cutoff, now - 30 * 24 * 3600 * 1000);
 
-    return events.filter((ev) => new Date(ev.timestamp).getTime() >= cutoff);
-  }, [events, timeRange]);
+    return events.filter((ev) => new Date(ev.timestamp).getTime() > cutoff);
+  }, [events, timeRange, resetCutoff]);
 
   // High level KPIs (100% Real Data, starts at 0)
   const kpis = useMemo(() => {
@@ -474,16 +479,19 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
           <button
             onClick={() => {
-              if (window.confirm('Reset semua log analitik lokal perangkat ini menjadi 0? (Data di PostHog Cloud tetap aman tersimpan)')) {
+              if (window.confirm('Reset semua metrik di dashboard ini menjadi 0 dan mulai pencatatan baru dari sekarang?')) {
+                const now = Date.now();
+                localStorage.setItem('agy_analytics_reset_cutoff', now.toString());
+                setResetCutoff(now);
                 clearLocalAnalyticsEvents();
                 setRefreshKey((k) => k + 1);
               }
             }}
-            title="Reset Analitik Lokal ke 0"
-            className="p-2 rounded-card border border-border hover:bg-rose-50 hover:text-rose-600 text-muted transition-colors flex items-center gap-1 text-xs"
+            title="Reset Analitik ke 0"
+            className="p-2 rounded-card border border-border hover:bg-rose-50 hover:text-rose-600 text-muted transition-colors flex items-center gap-1 text-xs font-semibold"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Reset</span>
+            <span className="hidden sm:inline">Reset ke 0</span>
           </button>
 
           <button
@@ -690,6 +698,29 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           </span>
         </div>
       </div>
+
+      {/* RESET BENCHMARK ACTIVE NOTIFICATION */}
+      {resetCutoff > 0 && (
+        <div className="p-3.5 rounded-card bg-amber-50 border border-amber-200 text-xs text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Pencatatan Baru Aktif:</strong> Metrik dimulai bersih dari{' '}
+              {new Date(resetCutoff).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB ({new Date(resetCutoff).toLocaleDateString('id-ID')}).
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem('agy_analytics_reset_cutoff');
+              setResetCutoff(0);
+              setRefreshKey((k) => k + 1);
+            }}
+            className="px-2.5 py-1 rounded bg-amber-200/80 hover:bg-amber-200 text-amber-900 font-bold text-[11px] shrink-0 transition-colors"
+          >
+            Pulihkan Riwayat Awal
+          </button>
+        </div>
+      )}
 
       {/* ZERO DATA NOTIFICATION IF EMPTY */}
       {filteredEvents.length === 0 && (
