@@ -149,8 +149,9 @@ export function captureUtmFromUrl(): UtmProperties {
     if (!utm.utm_source) {
       const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
       const ref = (typeof document !== 'undefined' ? document.referrer : '').toLowerCase();
+      const hasIgshid = params.has('igshid');
 
-      if (ua.includes('instagram') || ref.includes('instagram')) {
+      if (hasIgshid || ua.includes('instagram') || ref.includes('instagram') || ref.includes('l.instagram')) {
         utm.utm_source = 'instagram';
         utm.utm_medium = 'bio';
       } else if (ua.includes('whatsapp') || ref.includes('whatsapp') || ref.includes('wa.me')) {
@@ -165,7 +166,7 @@ export function captureUtmFromUrl(): UtmProperties {
       } else if (ref.includes('t.co') || ref.includes('twitter') || ua.includes('twitter')) {
         utm.utm_source = 'twitter';
         utm.utm_medium = 'social';
-      } else if (ref.includes('facebook') || ua.includes('fbav') || ua.includes('fban')) {
+      } else if (ref.includes('facebook') || ua.includes('fbav') || ua.includes('fban') || params.has('fbclid')) {
         utm.utm_source = 'facebook';
         utm.utm_medium = 'social';
       }
@@ -245,6 +246,102 @@ export function getLocalAnalyticsEvents(): StoredLocalEvent[] {
 export function clearLocalAnalyticsEvents(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(STORAGE_LOCAL_EVENTS);
+}
+
+// ==========================================
+// POSTHOG CLOUD QUERY & SYNC ENGINE
+// ==========================================
+const STORAGE_POSTHOG_PERSONAL_KEY = 'agy_posthog_personal_key';
+
+export function getStoredPostHogPersonalKey(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(STORAGE_POSTHOG_PERSONAL_KEY) || (import.meta.env.VITE_POSTHOG_PERSONAL_KEY as string) || '';
+}
+
+export function setStoredPostHogPersonalKey(key: string): void {
+  if (typeof window === 'undefined') return;
+  if (!key.trim()) {
+    localStorage.removeItem(STORAGE_POSTHOG_PERSONAL_KEY);
+  } else {
+    localStorage.setItem(STORAGE_POSTHOG_PERSONAL_KEY, key.trim());
+  }
+}
+
+export function getPostHogProjectKey(): string {
+  return import.meta.env.VITE_POSTHOG_KEY || 'phc_ARAmaXYZ9R72RBYTfGHGdQrsKdASmLAHusZHPkUurVbj';
+}
+
+export async function fetchPostHogCloudEvents(personalKey?: string): Promise<{ success: boolean; events: StoredLocalEvent[]; error?: string }> {
+  const token = (personalKey || getStoredPostHogPersonalKey()).trim();
+  if (!token) {
+    return { success: false, events: [], error: 'Personal API key not configured' };
+  }
+
+  // 1. Try serverless backend route (/api/posthog-query) to prevent CORS
+  try {
+    const res = await fetch('/api/posthog-query', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.events)) {
+        return { success: true, events: data.events };
+      }
+    }
+  } catch {
+    // Proxy fallback
+  }
+
+  // 2. Direct browser fetch fallback (using US endpoint)
+  try {
+    const rawHost = import.meta.env.VITE_POSTHOG_HOST || 'https://us.posthog.com';
+    const apiHost = rawHost.includes('.i.') ? rawHost.replace('.i.', '.') : rawHost;
+
+    const hogQuery = {
+      query: {
+        kind: 'HogQLQuery',
+        query: 'SELECT id, event, properties, timestamp FROM events WHERE timestamp >= now() - INTERVAL 30 DAY ORDER BY timestamp DESC LIMIT 500'
+      }
+    };
+
+    const directRes = await fetch(`${apiHost}/api/projects/@current/query/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(hogQuery)
+    });
+
+    if (!directRes.ok) {
+      const errText = await directRes.text();
+      return { success: false, events: [], error: `PostHog Cloud returned ${directRes.status}: ${errText}` };
+    }
+
+    const data = await directRes.json();
+    const rows = data.results || [];
+    const events: StoredLocalEvent[] = rows.map((row: any[]) => {
+      let props = row[2];
+      if (typeof props === 'string') {
+        try { props = JSON.parse(props); } catch { props = {}; }
+      }
+      return {
+        id: String(row[0] || Math.random()),
+        eventName: row[1] as AnalyticsEventName,
+        properties: props || {},
+        timestamp: row[3] || new Date().toISOString()
+      };
+    });
+
+    return { success: true, events };
+  } catch (directErr: any) {
+    return { success: false, events: [], error: directErr?.message || 'Failed to connect to PostHog Cloud' };
+  }
 }
 
 // ==========================================

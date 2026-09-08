@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart3, 
   Users, 
@@ -12,9 +12,24 @@ import {
   Filter, 
   ExternalLink,
   PieChart,
-  Info
+  Info,
+  Copy,
+  Check,
+  Radio,
+  Sparkles,
+  Smartphone,
+  Key,
+  Cloud
 } from 'lucide-react';
-import { getLocalAnalyticsEvents, clearLocalAnalyticsEvents, StoredLocalEvent } from '../../utils/analytics';
+import { 
+  getLocalAnalyticsEvents, 
+  clearLocalAnalyticsEvents, 
+  StoredLocalEvent,
+  getPostHogProjectKey,
+  getStoredPostHogPersonalKey,
+  setStoredPostHogPersonalKey,
+  fetchPostHogCloudEvents
+} from '../../utils/analytics';
 
 interface AdminAnalyticsPageProps {
   onBackToHome: () => void;
@@ -30,9 +45,21 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d' | 'all'>('all');
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Cloud Sync States
+  const [personalKey, setPersonalKey] = useState<string>(() => getStoredPostHogPersonalKey());
+  const [personalKeyInput, setPersonalKeyInput] = useState<string>(personalKey);
+  const [isCloudLoading, setIsCloudLoading] = useState<boolean>(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [cloudEvents, setCloudEvents] = useState<StoredLocalEvent[] | null>(null);
+  const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
+  const [copiedBioLink, setCopiedBioLink] = useState<boolean>(false);
+
+  const projectKey = getPostHogProjectKey();
+  const instagramBioUrl = 'https://bio-landing-page-seven.vercel.app/?utm_source=instagram&utm_medium=bio';
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Default PIN: 1740 or 'admin'
+    // Default PIN: 1740 or 'admin' or 'robert'
     if (pin === '1740' || pin === 'admin' || pin === 'robert') {
       setIsAuthenticated(true);
       sessionStorage.setItem('agy_admin_authenticated', 'true');
@@ -47,10 +74,69 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     setIsAuthenticated(false);
   };
 
-  // Pure real events from local storage (NO DUMMY / MOCK DATA)
+  // Sync from PostHog Cloud if personal API key is available
+  useEffect(() => {
+    if (!isAuthenticated || !personalKey) {
+      setCloudEvents(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsCloudLoading(true);
+    setCloudError(null);
+
+    fetchPostHogCloudEvents(personalKey)
+      .then((res) => {
+        if (!isMounted) return;
+        setIsCloudLoading(false);
+        if (res.success) {
+          setCloudEvents(res.events);
+          setCloudError(null);
+        } else {
+          setCloudError(res.error || 'Gagal mengambil data dari PostHog Cloud');
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setIsCloudLoading(false);
+        setCloudError(err?.message || 'Gagal menghubungi PostHog');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, personalKey, refreshKey]);
+
+  const handleSavePersonalKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanKey = personalKeyInput.trim();
+    setStoredPostHogPersonalKey(cleanKey);
+    setPersonalKey(cleanKey);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleClearPersonalKey = () => {
+    setStoredPostHogPersonalKey('');
+    setPersonalKey('');
+    setPersonalKeyInput('');
+    setCloudEvents(null);
+    setCloudError(null);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const handleCopyBioLink = () => {
+    navigator.clipboard.writeText(instagramBioUrl);
+    setCopiedBioLink(true);
+    setTimeout(() => setCopiedBioLink(false), 2500);
+  };
+
+  // Pure real events: Prefer PostHog Cloud events if loaded, otherwise local device storage
   const events = useMemo(() => {
+    if (cloudEvents && cloudEvents.length > 0) {
+      return cloudEvents;
+    }
     return getLocalAnalyticsEvents();
-  }, [refreshKey]);
+  }, [cloudEvents, refreshKey]);
 
   // Filter events by time range
   const filteredEvents = useMemo(() => {
@@ -68,14 +154,14 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     // Exclude internal admin dashboard views from public metrics
     const publicPageViews = filteredEvents.filter(
       (e) => e.eventName === 'page_view' && 
-             e.properties.page !== 'admin_analytics' && 
-             e.properties.page !== 'admin'
+             e.properties?.page !== 'admin_analytics' && 
+             e.properties?.page !== 'admin'
     );
 
     // Unique visitors deduplicated by visitor_id or session_id
     const uniqueVisitorIds = new Set(
       publicPageViews
-        .map((e) => e.properties.visitor_id || e.properties.session_id)
+        .map((e) => e.properties?.visitor_id || e.properties?.session_id || e.properties?.distinct_id)
         .filter(Boolean)
     );
 
@@ -111,10 +197,19 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     const map: Record<string, { visitors: number; starts: number; waClicks: number }> = {};
 
     filteredEvents.forEach((ev) => {
-      if (ev.eventName === 'page_view' && (ev.properties.page === 'admin_analytics' || ev.properties.page === 'admin')) {
+      if (ev.eventName === 'page_view' && (ev.properties?.page === 'admin_analytics' || ev.properties?.page === 'admin')) {
         return;
       }
-      const src = (ev.properties.first_touch_source || 'direct').toLowerCase();
+      const rawSrc = ev.properties?.first_touch_source || ev.properties?.utm_source || ev.properties?.$referrer || 'direct';
+      let src = String(rawSrc).toLowerCase();
+
+      // Normalize source display
+      if (src.includes('instagram')) src = 'instagram';
+      else if (src.includes('whatsapp') || src.includes('wa.me')) src = 'whatsapp';
+      else if (src.includes('linkedin')) src = 'linkedin';
+      else if (src.includes('tiktok')) src = 'tiktok';
+      else if (src.includes('twitter') || src.includes('t.co')) src = 'twitter';
+
       if (!map[src]) {
         map[src] = { visitors: 0, starts: 0, waClicks: 0 };
       }
@@ -140,7 +235,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     };
 
     filteredEvents.forEach((ev) => {
-      const tool = (ev.properties.tool_name || ev.properties.source_tool || '').toLowerCase().replace(/[- ]/g, '_');
+      const tool = (ev.properties?.tool_name || ev.properties?.source_tool || '').toLowerCase().replace(/[- ]/g, '_');
       if (map[tool]) {
         if (ev.eventName === 'tool_started') map[tool].starts++;
         if (ev.eventName === 'tool_completed') map[tool].completions++;
@@ -161,29 +256,29 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       count: kpis.uniqueVisitors, 
       pct: kpis.uniqueVisitors > 0 ? 100 : 0 
     },
-    {
-      label: '2. Mulai Assessment (Tool Started)',
-      count: kpis.toolStarts,
+    { 
+      label: '2. Mulai Assessment (Tool Started)', 
+      count: kpis.toolStarts, 
       pct: kpis.uniqueVisitors > 0 ? Math.round((kpis.toolStarts / kpis.uniqueVisitors) * 100) : 0,
     },
-    {
-      label: '3. Menyelesaikan Hasil (Completed)',
-      count: kpis.toolCompletions,
+    { 
+      label: '3. Menyelesaikan Hasil (Completed)', 
+      count: kpis.toolCompletions, 
       pct: kpis.toolStarts > 0 ? Math.round((kpis.toolCompletions / kpis.toolStarts) * 100) : 0,
     },
-    {
-      label: '4. Membaca Edukasi Risiko',
-      count: kpis.riskEdViews,
+    { 
+      label: '4. Membaca Edukasi Risiko', 
+      count: kpis.riskEdViews, 
       pct: kpis.toolCompletions > 0 ? Math.round((kpis.riskEdViews / kpis.toolCompletions) * 100) : 0,
     },
-    {
-      label: '5. Membuka Protection Gap',
-      count: kpis.protectionOpens,
+    { 
+      label: '5. Membuka Protection Gap', 
+      count: kpis.protectionOpens, 
       pct: kpis.riskEdViews > 0 ? Math.round((kpis.protectionOpens / kpis.riskEdViews) * 100) : 0,
     },
-    {
-      label: '6. Konsultasi WhatsApp Clicked',
-      count: kpis.waClicks,
+    { 
+      label: '6. Konsultasi WhatsApp Clicked', 
+      count: kpis.waClicks, 
       pct: kpis.toolCompletions > 0 ? Math.round((kpis.waClicks / kpis.toolCompletions) * 100) : 0,
     },
   ];
@@ -207,7 +302,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="Masukkan PIN (Default: 1740)"
-              className="w-full text-center tracking-widest text-lg px-4 py-3 rounded-card border border-border focus:border-teal-brand outline-none bg-white text-foreground"
+              className="w-full text-center tracking-widest text-lg px-4 py-3 rounded-card border border-border focus:border-teal-brand outline-none bg-white text-foreground shadow-sm"
               autoFocus
             />
             {authError && (
@@ -238,7 +333,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
   // AUTHENTICATED DASHBOARD VIEW
   return (
-    <div className="max-w-[760px] mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-200">
+    <div className="max-w-[760px] mx-auto px-4 py-8 space-y-6 animate-in fade-in duration-200">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-5">
         <div>
@@ -249,16 +344,24 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Kembali ke Situs</span>
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
               Owner Analytics &amp; Funnel Hub
             </h1>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-              Real Data (100% Murni)
-            </span>
+            {cloudEvents && cloudEvents.length > 0 ? (
+              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <Cloud className="w-3 h-3" />
+                PostHog Cloud Live ({cloudEvents.length} event)
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                <Smartphone className="w-3 h-3" />
+                Log Lokal Perangkat
+              </span>
+            )}
           </div>
           <p className="text-xs text-muted mt-0.5">
-            Semua angka di bawah adalah hasil rekaman riil aktivitas pengunjung, tanpa data dummy.
+            Semua metrik murni berasal dari aktivitas pengguna riil, tanpa data simulasi/dummy.
           </p>
         </div>
 
@@ -267,23 +370,24 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
             title="Refresh Data"
-            className="p-2 rounded-card border border-border hover:bg-section text-muted hover:text-foreground transition-colors"
+            className="p-2 rounded-card border border-border hover:bg-section text-muted hover:text-foreground transition-colors flex items-center gap-1 text-xs font-semibold"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-3.5 h-3.5 ${isCloudLoading ? 'animate-spin text-teal-brand' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
 
           <button
             onClick={() => {
-              if (window.confirm('Reset semua log analitik lokal menjadi 0?')) {
+              if (window.confirm('Reset semua log analitik lokal perangkat ini menjadi 0? (Data di PostHog Cloud tetap aman tersimpan)')) {
                 clearLocalAnalyticsEvents();
                 setRefreshKey((k) => k + 1);
               }
             }}
-            title="Reset Analitik ke 0"
+            title="Reset Analitik Lokal ke 0"
             className="p-2 rounded-card border border-border hover:bg-rose-50 hover:text-rose-600 text-muted transition-colors flex items-center gap-1 text-xs"
           >
-            <Trash2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Reset ke 0</span>
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Reset</span>
           </button>
 
           <button
@@ -292,6 +396,172 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           >
             Kunci
           </button>
+        </div>
+      </div>
+
+      {/* COMMAND CENTER: POSTHOG LIVE CLOUD HUB */}
+      <div className="p-4 sm:p-5 rounded-card-lg bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 text-white shadow-soft space-y-3.5 border border-slate-700/60">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              PostHog Cloud Stream Aktif
+            </span>
+            <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded border border-slate-700">
+              {projectKey ? `${projectKey.substring(0, 10)}...` : 'Connected'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => setShowKeyConfig((v) => !v)}
+            className="text-[11px] text-teal-300 hover:text-teal-200 font-medium inline-flex items-center gap-1 self-start sm:self-auto underline"
+          >
+            <Key className="w-3 h-3" />
+            <span>{showKeyConfig ? 'Tutup Pengaturan API Sync' : 'Sinkronkan Angka Langsung ke Halaman Ini'}</span>
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-300 leading-relaxed">
+          Setiap klik dari link bio Instagram atau WhatsApp di HP pengunjung <strong>sudah otomatis terkirim ke PostHog Cloud</strong> secara real-time. Buka konsol PostHog di bawah untuk memantau pengunjung detik ini juga:
+        </p>
+
+        {/* 3 Quick Launch Action Buttons */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          <a
+            href="https://us.posthog.com/events"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-2.5 rounded-card bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-semibold text-white transition-all group hover:border-teal-400/50"
+          >
+            <div className="flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-rose-400 group-hover:animate-pulse" />
+              <span>Live Events Stream</span>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+          </a>
+
+          <a
+            href="https://us.posthog.com/web"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-2.5 rounded-card bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-semibold text-white transition-all group hover:border-teal-400/50"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
+              <span>Web Analytics</span>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+          </a>
+
+          <a
+            href="https://us.posthog.com/replay"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between p-2.5 rounded-card bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-semibold text-white transition-all group hover:border-teal-400/50"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Rekaman Layar (Replay)</span>
+            </div>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-white" />
+          </a>
+        </div>
+
+        {/* Expandable Cloud Sync Configuration */}
+        {showKeyConfig && (
+          <div className="mt-3 p-3.5 rounded-card bg-slate-950 border border-teal-500/30 text-xs space-y-2.5 text-slate-200">
+            <div className="font-semibold text-teal-300 flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5" />
+              <span>Pengaturan PostHog Personal API Key (HogQL Direct Sync)</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Agar tabel dan kartu di bawah otomatis menarik data live dari PostHog Cloud (bukan sekadar memory browser laptop), masukkan <strong>Personal API Key</strong> Anda:
+            </p>
+            <form onSubmit={handleSavePersonalKey} className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="password"
+                value={personalKeyInput}
+                onChange={(e) => setPersonalKeyInput(e.target.value)}
+                placeholder="phx_... (Personal API Key)"
+                className="flex-1 px-3 py-2 rounded bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-teal-400"
+              />
+              <button
+                type="submit"
+                disabled={isCloudLoading}
+                className="px-3 py-2 bg-teal-brand hover:bg-teal-light text-white font-bold rounded text-xs transition-colors shrink-0 flex items-center justify-center gap-1"
+              >
+                {isCloudLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : null}
+                <span>Simpan &amp; Tarik Cloud</span>
+              </button>
+              {personalKey && (
+                <button
+                  type="button"
+                  onClick={handleClearPersonalKey}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors shrink-0"
+                >
+                  Hapus
+                </button>
+              )}
+            </form>
+
+            {cloudError && (
+              <p className="text-[11px] text-rose-400 font-medium">
+                ⚠️ {cloudError}
+              </p>
+            )}
+
+            <div className="text-[10px] text-slate-400 pt-1 space-y-1">
+              <div>💡 <strong>Cara dapatkan Personal API Key (30 detik):</strong></div>
+              <div>
+                1. Buka akun PostHog Anda di{' '}
+                <a
+                  href="https://us.posthog.com/settings/user-api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-teal-300 underline font-semibold hover:text-teal-200"
+                >
+                  us.posthog.com/settings/user-api-keys
+                </a>
+              </div>
+              <div>2. Klik tombol <strong>+ Create personal API key</strong></div>
+              <div>3. Salin kode yang diawali dengan <code className="text-teal-300 font-mono">phx_...</code> dan tempelkan ke kolom di atas.</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* INSTAGRAM BIO LINK ATTRIBUTION CARD */}
+      <div className="p-4 rounded-card bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="font-bold flex items-center gap-1.5 text-amber-900">
+            <Smartphone className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>Link Khusus Bio Instagram (Garansi 100% Terdeteksi)</span>
+          </div>
+          <button
+            onClick={handleCopyBioLink}
+            className="text-[11px] font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-2.5 py-1 rounded transition-colors inline-flex items-center gap-1 shrink-0"
+          >
+            {copiedBioLink ? (
+              <>
+                <Check className="w-3 h-3 text-emerald-700" />
+                <span className="text-emerald-800 font-bold">Tersalin!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Salin Link</span>
+              </>
+            )}
+          </button>
+        </div>
+        <p className="text-[11px] leading-relaxed text-amber-900">
+          Browser bawaan Instagram di HP (In-App WebView) sering kali memblokir informasi peramban karena aturan privasi Apple/Android. Pasang link berikut di bio Instagram Anda agar seluruh kunjungan <strong>pasti tercatat sebagai INSTAGRAM (bio)</strong>:
+        </p>
+        <div className="p-2 rounded bg-white border border-amber-300/80 font-mono text-[11px] text-amber-900 break-all select-all flex items-center justify-between gap-2">
+          <span>{instagramBioUrl}</span>
         </div>
       </div>
 
@@ -317,9 +587,11 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           </div>
         </div>
 
-        <div className="text-[11px] text-muted flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-          <span>Log Perangkat: {events.length} event tersimpan</span>
+        <div className="text-[11px] text-muted flex items-center gap-1.5">
+          <span className={`w-2 h-2 rounded-full ${cloudEvents ? 'bg-emerald-500' : 'bg-teal-500'} inline-block`}></span>
+          <span>
+            {cloudEvents ? `Cloud Sync: ${filteredEvents.length} event` : `Log Perangkat Ini: ${filteredEvents.length} event`}
+          </span>
         </div>
       </div>
 
@@ -329,9 +601,9 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           <Info className="w-4 h-4 text-teal-brand shrink-0 mt-0.5" />
           <div>
             <span className="font-bold text-foreground block">
-              Data masih kosong (0)
+              Data pada browser ini masih 0
             </span>
-            Belum ada kunjungan atau interaksi pada rentang waktu ini. Angka akan otomatis bertambah secara real-time saat ada pengunjung membuka halaman, mencoba kalkulator, atau mengklik tombol WhatsApp.
+            Jika Anda mengklik link dari HP lain, datanya telah aman tercatat di PostHog Cloud (klik tombol <strong>Live Events Stream</strong> di atas untuk melihatnya). Agar data di tabel bawah ini langsung sinkron dengan PostHog Cloud, aktifkan fitur <strong>Sinkronkan Angka Langsung ke Halaman Ini</strong> di atas.
           </div>
         </div>
       )}
@@ -460,7 +732,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         <div className="overflow-x-auto">
           {trafficSources.length === 0 ? (
             <div className="py-6 text-center text-xs text-muted">
-              Belum ada data traffic kunjungan tercatat.
+              Belum ada data traffic kunjungan tercatat pada browser ini.
             </div>
           ) : (
             <table className="w-full text-xs text-left">
@@ -489,32 +761,6 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
             </table>
           )}
         </div>
-      </div>
-
-      {/* POSTHOG INTEGRATION GUIDE CARD */}
-      <div className="p-4 rounded-card bg-teal-50 border border-teal-brand/30 text-xs text-teal-950 space-y-2 leading-relaxed">
-        <div className="font-bold flex items-center gap-1.5 text-teal-brand">
-          <ExternalLink className="w-4 h-4" />
-          <span>Menghubungkan Data Lintas Perangkat (Cloud Real-Time)</span>
-        </div>
-        <p>
-          Agar data dari HP pengunjung luar otomatis masuk ke dashboard ini, hubungkan dengan <strong>PostHog Cloud</strong> (gratis 1.000.000 event/bulan):
-        </p>
-        <ol className="list-decimal list-inside space-y-1 text-[11px] text-teal-900 pl-1">
-          <li>
-            Daftar gratis di <a href="https://app.posthog.com/signup" target="_blank" rel="noopener noreferrer" className="underline font-bold text-teal-700 hover:text-teal-900">app.posthog.com/signup</a> (bisa 1 klik dengan akun Google).
-          </li>
-          <li>
-            Salin <strong>Project API Key</strong> Anda (diawali dengan <code className="bg-white/80 px-1 py-0.5 rounded border border-teal-200 font-mono">phc_...</code>).
-          </li>
-          <li>
-            Kirimkan kode <code className="bg-white/80 px-1 py-0.5 rounded border border-teal-200 font-mono">phc_...</code> tersebut ke AI assistant di chat untuk langsung dipasangkan dan di-autodeploy, atau tambahkan di Vercel Environment Variables:
-            <div className="mt-1 p-2 rounded bg-white border border-teal-brand/20 font-mono text-[10px] text-teal-900">
-              VITE_POSTHOG_KEY=phc_your_key_here<br />
-              VITE_POSTHOG_HOST=https://us.i.posthog.com
-            </div>
-          </li>
-        </ol>
       </div>
     </div>
   );
