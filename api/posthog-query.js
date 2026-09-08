@@ -8,7 +8,9 @@ export default async function handler(req, res) {
   }
 
   const authHeader = req.headers.authorization || '';
-  const personalKey = authHeader.replace(/^Bearer\s+/i, '').trim() || process.env.POSTHOG_PERSONAL_KEY;
+  const personalKey =
+    authHeader.replace(/^Bearer\s+/i, '').trim() ||
+    process.env.POSTHOG_PERSONAL_KEY;
 
   if (!personalKey) {
     return res.status(200).json({ 
