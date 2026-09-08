@@ -74,38 +74,22 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
           <div className="text-2xl mb-2">🎯</div>
           
           <h3 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
-            {savedLifeScore ? 'Lihat Life Score Saya' : 'Cek Life Score Saya'}
+            Cek Life Score Saya
           </h3>
 
           <p className="text-xs sm:text-sm text-muted mt-1.5 max-w-md mx-auto leading-relaxed">
             8 pertanyaan sederhana tentang kesehatan, keuangan &amp; kesiapan hidup.
           </p>
 
-          {savedLifeScore && (
-            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-brand/10 text-teal-brand text-xs font-semibold">
-              <span>Terakhir: {savedLifeScore.overallScore} / 100</span>
-              <span>•</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRetakeLifeScore();
-                }}
-                className="underline hover:text-teal-dark"
-              >
-                Hitung ulang
-              </button>
-            </div>
-          )}
-
           <div className="mt-6">
             <button
               onClick={() => {
-                analytics.track('life_score_cta_clicked', { has_saved_score: !!savedLifeScore });
+                analytics.track('life_score_cta_clicked', { has_saved_score: false });
                 onStartLifeScore();
               }}
               className="w-full sm:w-auto min-w-[240px] bg-teal-brand hover:bg-teal-light active:scale-[0.98] text-white font-bold py-3.5 px-8 rounded-btn shadow-soft text-sm transition-all inline-flex items-center justify-center gap-2 group"
             >
-              <span>{savedLifeScore ? 'Buka Hasil Saya' : 'Mulai Sekarang'}</span>
+              <span>Mulai Sekarang</span>
               <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>

@@ -7,7 +7,8 @@ import {
 import { 
   getStoredProfile, 
   getStoredResults, 
-  updateStoredProfile 
+  updateStoredProfile,
+  resetUserData
 } from './utils/storage';
 import { analytics } from './utils/analytics';
 
@@ -80,6 +81,28 @@ export function App() {
     };
   }, []);
 
+  // Auto-clear test evaluation data if visitor enters fresh via campaign/Instagram link
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const hasCampaignParams =
+        params.has('utm_source') ||
+        params.has('utm_medium') ||
+        params.has('utm_campaign') ||
+        params.has('igshid') ||
+        params.has('fbclid') ||
+        params.has('ref');
+      const isExternalReferrer =
+        document.referrer && !document.referrer.includes(window.location.hostname);
+
+      if (hasCampaignParams || isExternalReferrer) {
+        resetUserData();
+      }
+    } catch (err) {
+      console.warn('[App] Session auto-reset error:', err);
+    }
+  }, []);
+
   // Global event listeners for cross-component navigation bridges
   useEffect(() => {
     const handleViewChange = (e: any) => {
@@ -135,7 +158,6 @@ export function App() {
             {activeTool === 'life-readiness' && (
               <LifeReadinessRunner
                 initialProfile={profile}
-                savedResult={results.lifeReadiness}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -143,7 +165,6 @@ export function App() {
             {activeTool === 'lifestyle-age' && (
               <LifestyleAgeRunner
                 initialProfile={profile}
-                savedResult={results.lifestyleAge}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -151,7 +172,6 @@ export function App() {
             {activeTool === 'wellness-score' && (
               <WellnessRunner
                 initialProfile={profile}
-                savedResult={results.wellness}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -159,7 +179,6 @@ export function App() {
             {activeTool === 'financial-health' && (
               <FinancialHealthRunner
                 initialProfile={profile}
-                savedResult={results.financialHealth}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -167,7 +186,6 @@ export function App() {
             {activeTool === 'emergency-checker' && (
               <EmergencyCheckerRunner
                 initialProfile={profile}
-                savedResult={results.emergencyRunway}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -175,7 +193,6 @@ export function App() {
             {activeTool === 'medical-simulator' && (
               <MedicalSimulatorRunner
                 initialProfile={profile}
-                savedResult={results.medicalScenario}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -183,7 +200,6 @@ export function App() {
             {activeTool === 'family-readiness' && (
               <FamilyReadinessRunner
                 initialProfile={profile}
-                savedResult={results.familyReadiness}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -191,7 +207,6 @@ export function App() {
             {activeTool === 'health-checklist' && (
               <HealthChecklistRunner
                 initialProfile={profile}
-                savedResult={results.healthChecklist}
                 onNavigateToTool={handleSelectTool}
                 onClose={handleCloseTool}
               />
@@ -199,7 +214,6 @@ export function App() {
             {activeTool === 'protection-gap' && (
               <ProtectionGapRunner
                 initialProfile={profile}
-                savedResult={results.protectionGap}
                 onNavigateToTool={handleSelectTool}
                 onNavigateToEducation={() => {
                   setActiveTool(null);
