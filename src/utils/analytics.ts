@@ -398,6 +398,16 @@ class AnalyticsClient {
     } else if (this.isDebug) {
       console.info('[Analytics] Running in local/dev mode (no PostHog key set). Events stored locally.');
     }
+
+    // Handle bfcache restoration (when Instagram / mobile browser brings back suspended webview)
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        captureUtmFromUrl();
+        setTimeout(() => {
+          this.page('home', { source_resumed: 'bfcache' });
+        }, 200);
+      }
+    });
   }
 
   public track(eventName: AnalyticsEventName, properties?: Record<string, any>) {
@@ -408,6 +418,9 @@ class AnalyticsClient {
       ...safeProps,
       visitor_id: getOrCreateVisitorId(),
       session_id: getOrCreateSessionId(),
+      utm_source: lastTouch.utm_source || firstTouch.utm_source || undefined,
+      utm_medium: lastTouch.utm_medium || firstTouch.utm_medium || undefined,
+      utm_campaign: lastTouch.utm_campaign || firstTouch.utm_campaign || undefined,
       first_touch_source: firstTouch.utm_source || 'direct',
       first_touch_medium: firstTouch.utm_medium,
       first_touch_campaign: firstTouch.utm_campaign,

@@ -210,6 +210,36 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     };
   }, [filteredEvents]);
 
+  // Helper to extract normalized source channel from event properties
+  const getEventSource = (props?: Record<string, any>): string => {
+    if (!props) return 'direct';
+    
+    // 1. Check UTM and campaign attribution
+    const utmSource = String(props.utm_source || props.last_touch_source || props.first_touch_source || '').toLowerCase();
+    if (utmSource.includes('instagram') || utmSource === 'ig' || utmSource.includes('ig_') || utmSource === 'insta') {
+      return 'instagram';
+    }
+    if (utmSource.includes('whatsapp') || utmSource.includes('wa.me') || utmSource === 'wa') {
+      return 'whatsapp';
+    }
+    if (utmSource.includes('linkedin')) return 'linkedin';
+    if (utmSource.includes('tiktok')) return 'tiktok';
+    if (utmSource.includes('twitter') || utmSource.includes('t.co')) return 'twitter';
+    if (utmSource.includes('facebook') || utmSource.includes('fb')) return 'facebook';
+
+    // 2. Check referrer headers
+    const ref = String(props.$referrer || props.referrer || '').toLowerCase();
+    if (ref.includes('instagram') || ref.includes('l.instagram.com')) return 'instagram';
+    if (ref.includes('whatsapp') || ref.includes('wa.me')) return 'whatsapp';
+    if (ref.includes('linkedin')) return 'linkedin';
+    if (ref.includes('tiktok')) return 'tiktok';
+    if (ref.includes('twitter') || ref.includes('t.co')) return 'twitter';
+    if (ref.includes('facebook')) return 'facebook';
+
+    if (utmSource && utmSource !== 'direct' && utmSource !== 'undefined') return utmSource;
+    return 'direct';
+  };
+
   // Traffic Source Breakdown
   const trafficSources = useMemo(() => {
     const map: Record<string, { visitors: number; starts: number; waClicks: number }> = {};
@@ -219,21 +249,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           (ev.properties?.page === 'admin_analytics' || ev.properties?.page === 'admin')) {
         return;
       }
-      const rawSrc = ev.properties?.first_touch_source || ev.properties?.utm_source || ev.properties?.$referrer || 'direct';
-      let src = String(rawSrc).toLowerCase();
-
-      // Normalize source display (including ig, wa, etc.)
-      if (src.includes('instagram') || src === 'ig' || src.includes('ig_') || src === 'insta') {
-        src = 'instagram';
-      } else if (src.includes('whatsapp') || src.includes('wa.me') || src === 'wa') {
-        src = 'whatsapp';
-      } else if (src.includes('linkedin')) {
-        src = 'linkedin';
-      } else if (src.includes('tiktok')) {
-        src = 'tiktok';
-      } else if (src.includes('twitter') || src.includes('t.co')) {
-        src = 'twitter';
-      }
+      const src = getEventSource(ev.properties);
 
       if (!map[src]) {
         map[src] = { visitors: 0, starts: 0, waClicks: 0 };
@@ -794,7 +810,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           <div className="divide-y divide-border/60 overflow-x-auto">
             {recentActivities.map((act) => {
               const actInfo = formatActivityLabel(act.eventName, act.properties);
-              const srcInfo = formatSourceBadge(act.properties?.first_touch_source || act.properties?.utm_source);
+              const srcInfo = formatSourceBadge(getEventSource(act.properties));
               return (
                 <div key={act.id} className="py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-section/30 px-1 rounded transition-colors">
                   <div className="flex items-center gap-2.5 min-w-0">
