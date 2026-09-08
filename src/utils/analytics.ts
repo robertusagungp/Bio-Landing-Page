@@ -274,8 +274,8 @@ class AnalyticsClient {
     const debugEnv = import.meta.env.VITE_ANALYTICS_DEBUG;
     this.isDebug = debugEnv === 'true' || localStorage.getItem('agy_analytics_debug') === 'true';
 
-    // Check PostHog keys
-    const apiKey = import.meta.env.VITE_POSTHOG_KEY;
+    // Check PostHog keys (Robertus Agung Pradana Project)
+    const apiKey = import.meta.env.VITE_POSTHOG_KEY || 'phc_ARAmaXYZ9R72RBYTfGHGdQrsKdASmLAHusZHPkUurVbj';
     const apiHost = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
 
     if (apiKey && apiKey !== 'YOUR_POSTHOG_KEY') {
