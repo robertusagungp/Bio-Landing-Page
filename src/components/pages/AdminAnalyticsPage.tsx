@@ -492,21 +492,29 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       </div>
 
       {/* POSTHOG INTEGRATION GUIDE CARD */}
-      <div className="p-4 rounded-card bg-teal-50 border border-teal-brand/30 text-xs text-teal-950 space-y-1.5 leading-relaxed">
+      <div className="p-4 rounded-card bg-teal-50 border border-teal-brand/30 text-xs text-teal-950 space-y-2 leading-relaxed">
         <div className="font-bold flex items-center gap-1.5 text-teal-brand">
           <ExternalLink className="w-4 h-4" />
-          <span>PostHog Cloud Setup (Opsional)</span>
+          <span>Menghubungkan Data Lintas Perangkat (Cloud Real-Time)</span>
         </div>
         <p>
-          Situs ini sudah siap terhubung ke PostHog Cloud. Cukup tambahkan environment variable di dashboard Vercel project:
+          Agar data dari HP pengunjung luar otomatis masuk ke dashboard ini, hubungkan dengan <strong>PostHog Cloud</strong> (gratis 1.000.000 event/bulan):
         </p>
-        <div className="p-2 rounded bg-white border border-teal-brand/20 font-mono text-[11px] text-teal-900">
-          VITE_POSTHOG_KEY=phc_your_key_here<br />
-          VITE_POSTHOG_HOST=https://us.i.posthog.com
-        </div>
-        <p className="text-[11px] text-teal-800">
-          Semua event akan otomatis terkirim ke PostHog dashboard secara terenkripsi dan bebas dari data sensitif (PII).
-        </p>
+        <ol className="list-decimal list-inside space-y-1 text-[11px] text-teal-900 pl-1">
+          <li>
+            Daftar gratis di <a href="https://app.posthog.com/signup" target="_blank" rel="noopener noreferrer" className="underline font-bold text-teal-700 hover:text-teal-900">app.posthog.com/signup</a> (bisa 1 klik dengan akun Google).
+          </li>
+          <li>
+            Salin <strong>Project API Key</strong> Anda (diawali dengan <code className="bg-white/80 px-1 py-0.5 rounded border border-teal-200 font-mono">phc_...</code>).
+          </li>
+          <li>
+            Kirimkan kode <code className="bg-white/80 px-1 py-0.5 rounded border border-teal-200 font-mono">phc_...</code> tersebut ke AI assistant di chat untuk langsung dipasangkan dan di-autodeploy, atau tambahkan di Vercel Environment Variables:
+            <div className="mt-1 p-2 rounded bg-white border border-teal-brand/20 font-mono text-[10px] text-teal-900">
+              VITE_POSTHOG_KEY=phc_your_key_here<br />
+              VITE_POSTHOG_HOST=https://us.i.posthog.com
+            </div>
+          </li>
+        </ol>
       </div>
     </div>
   );
