@@ -10,16 +10,18 @@ import {
   RefreshCw, 
   Trash2, 
   Filter, 
-  ExternalLink,
-  PieChart,
-  Info,
-  Copy,
-  Check,
-  Radio,
-  Sparkles,
-  Smartphone,
-  Key,
-  Cloud
+  ExternalLink, 
+  PieChart, 
+  Info, 
+  Copy, 
+  Check, 
+  Radio, 
+  Sparkles, 
+  Smartphone, 
+  Key, 
+  Cloud,
+  Activity,
+  Clock
 } from 'lucide-react';
 import { 
   getLocalAnalyticsEvents, 
@@ -51,6 +53,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const [isCloudLoading, setIsCloudLoading] = useState<boolean>(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [cloudEvents, setCloudEvents] = useState<StoredLocalEvent[] | null>(null);
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
   const [copiedBioLink, setCopiedBioLink] = useState<boolean>(false);
 
@@ -92,6 +95,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         if (res.success) {
           setCloudEvents(res.events);
           setCloudError(null);
+          setLastSyncedTime(new Date().toLocaleTimeString('id-ID'));
         } else {
           setCloudError(res.error || 'Gagal mengambil data dari PostHog Cloud');
         }
@@ -106,6 +110,15 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       isMounted = false;
     };
   }, [isAuthenticated, personalKey, refreshKey]);
+
+  // Real-time Auto Refresh Polling (every 8 seconds if personalKey is configured)
+  useEffect(() => {
+    if (!isAuthenticated || !personalKey) return;
+    const interval = setInterval(() => {
+      setRefreshKey((k) => k + 1);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, personalKey]);
 
   const handleSavePersonalKey = (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,12 +166,12 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const kpis = useMemo(() => {
     // Exclude internal admin dashboard views from public metrics
     const publicPageViews = filteredEvents.filter(
-      (e) => e.eventName === 'page_view' && 
+      (e) => (e.eventName === 'page_view' || e.eventName === '$pageview') && 
              e.properties?.page !== 'admin_analytics' && 
              e.properties?.page !== 'admin'
     );
 
-    // Unique visitors deduplicated by visitor_id or session_id
+    // Unique visitors deduplicated by visitor_id, session_id, or distinct_id
     const uniqueVisitorIds = new Set(
       publicPageViews
         .map((e) => e.properties?.visitor_id || e.properties?.session_id || e.properties?.distinct_id)
@@ -197,23 +210,30 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     const map: Record<string, { visitors: number; starts: number; waClicks: number }> = {};
 
     filteredEvents.forEach((ev) => {
-      if (ev.eventName === 'page_view' && (ev.properties?.page === 'admin_analytics' || ev.properties?.page === 'admin')) {
+      if ((ev.eventName === 'page_view' || ev.eventName === '$pageview') && 
+          (ev.properties?.page === 'admin_analytics' || ev.properties?.page === 'admin')) {
         return;
       }
       const rawSrc = ev.properties?.first_touch_source || ev.properties?.utm_source || ev.properties?.$referrer || 'direct';
       let src = String(rawSrc).toLowerCase();
 
-      // Normalize source display
-      if (src.includes('instagram')) src = 'instagram';
-      else if (src.includes('whatsapp') || src.includes('wa.me')) src = 'whatsapp';
-      else if (src.includes('linkedin')) src = 'linkedin';
-      else if (src.includes('tiktok')) src = 'tiktok';
-      else if (src.includes('twitter') || src.includes('t.co')) src = 'twitter';
+      // Normalize source display (including ig, wa, etc.)
+      if (src.includes('instagram') || src === 'ig' || src.includes('ig_') || src === 'insta') {
+        src = 'instagram';
+      } else if (src.includes('whatsapp') || src.includes('wa.me') || src === 'wa') {
+        src = 'whatsapp';
+      } else if (src.includes('linkedin')) {
+        src = 'linkedin';
+      } else if (src.includes('tiktok')) {
+        src = 'tiktok';
+      } else if (src.includes('twitter') || src.includes('t.co')) {
+        src = 'twitter';
+      }
 
       if (!map[src]) {
         map[src] = { visitors: 0, starts: 0, waClicks: 0 };
       }
-      if (ev.eventName === 'page_view') map[src].visitors++;
+      if (ev.eventName === 'page_view' || ev.eventName === '$pageview') map[src].visitors++;
       if (ev.eventName === 'tool_started') map[src].starts++;
       if (ev.eventName === 'whatsapp_clicked') map[src].waClicks++;
     });
@@ -249,6 +269,17 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     }).sort((a, b) => b.starts - a.starts);
   }, [filteredEvents]);
 
+  // Recent Live Activity Stream (Public events only, excluding admin noise)
+  const recentActivities = useMemo(() => {
+    return filteredEvents
+      .filter((ev) => {
+        if (ev.properties?.page === 'admin_analytics' || ev.properties?.page === 'admin') return false;
+        if (ev.eventName.startsWith('$')) return false; // hide posthog internal telemetry
+        return true;
+      })
+      .slice(0, 15);
+  }, [filteredEvents]);
+
   // Conversion Funnel Data (starts from 0)
   const funnelSteps = [
     { 
@@ -282,6 +313,65 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       pct: kpis.toolCompletions > 0 ? Math.round((kpis.waClicks / kpis.toolCompletions) * 100) : 0,
     },
   ];
+
+  const formatActivityLabel = (evName: string, props?: Record<string, any>) => {
+    switch (evName) {
+      case 'whatsapp_clicked':
+        return { label: 'Konsultasi WhatsApp', icon: '💬', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'page_view':
+        return { 
+          label: props?.page ? `Kunjungan Halaman (${props.page})` : 'Kunjungan Halaman', 
+          icon: '👁️', 
+          badge: 'bg-blue-50 text-blue-700 border-blue-200' 
+        };
+      case 'tool_started':
+        return { 
+          label: props?.tool_name ? `Mulai Asesmen (${props.tool_name})` : 'Mulai Asesmen', 
+          icon: '🚀', 
+          badge: 'bg-teal-50 text-teal-700 border-teal-200' 
+        };
+      case 'tool_completed':
+        return { 
+          label: props?.tool_name ? `Selesai Asesmen (${props.tool_name})` : 'Selesai Asesmen', 
+          icon: '🏁', 
+          badge: 'bg-purple-50 text-purple-700 border-purple-200' 
+        };
+      case 'lead_capture_saved':
+        return { label: 'Simpan Kontak Lead', icon: '📋', badge: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'tool_question_answered':
+        return { label: 'Menjawab Pertanyaan', icon: '✍️', badge: 'bg-slate-50 text-slate-700 border-slate-200' };
+      case 'tool_question_viewed':
+        return { label: 'Melihat Pertanyaan', icon: '❓', badge: 'bg-slate-50 text-slate-600 border-slate-200' };
+      default:
+        return { label: evName.replace(/_/g, ' '), icon: '⚡', badge: 'bg-slate-50 text-slate-700 border-slate-200' };
+    }
+  };
+
+  const formatSourceBadge = (rawSrc?: string) => {
+    const s = String(rawSrc || 'direct').toLowerCase();
+    if (s.includes('instagram') || s === 'ig' || s.includes('ig_') || s === 'insta') {
+      return { label: 'INSTAGRAM', badge: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
+    }
+    if (s.includes('whatsapp') || s.includes('wa.me') || s === 'wa') {
+      return { label: 'WHATSAPP', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold' };
+    }
+    if (s.includes('linkedin')) {
+      return { label: 'LINKEDIN', badge: 'bg-sky-50 text-sky-700 border-sky-200 font-bold' };
+    }
+    if (s.includes('tiktok')) {
+      return { label: 'TIKTOK', badge: 'bg-slate-900 text-white border-slate-800 font-bold' };
+    }
+    return { label: 'DIRECT', badge: 'bg-slate-100 text-slate-700 border-slate-200 font-bold' };
+  };
+
+  const formatTimeWib = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+    } catch {
+      return isoString;
+    }
+  };
 
   // PIN AUTH FORM
   if (!isAuthenticated) {
@@ -349,27 +439,33 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
               Owner Analytics &amp; Funnel Hub
             </h1>
             {cloudEvents && cloudEvents.length > 0 ? (
-              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-300">
                 <Cloud className="w-3 h-3" />
                 PostHog Cloud Live ({cloudEvents.length} event)
               </span>
             ) : (
-              <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+              <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-teal-300">
                 <Smartphone className="w-3 h-3" />
                 Log Lokal Perangkat
               </span>
             )}
           </div>
-          <p className="text-xs text-muted mt-0.5">
-            Semua metrik murni berasal dari aktivitas pengguna riil, tanpa data simulasi/dummy.
-          </p>
+          <div className="flex items-center gap-2 text-xs text-muted mt-0.5">
+            <span>Metrik murni aktivitas pengguna riil, tanpa simulasi.</span>
+            {lastSyncedTime && (
+              <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Tersinkronkan: {lastSyncedTime}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
-            title="Refresh Data"
+            title="Refresh Data Cloud"
             className="p-2 rounded-card border border-border hover:bg-section text-muted hover:text-foreground transition-colors flex items-center gap-1 text-xs font-semibold"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isCloudLoading ? 'animate-spin text-teal-brand' : ''}`} />
@@ -420,12 +516,12 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
             className="text-[11px] text-teal-300 hover:text-teal-200 font-medium inline-flex items-center gap-1 self-start sm:self-auto underline"
           >
             <Key className="w-3 h-3" />
-            <span>{showKeyConfig ? 'Tutup Pengaturan API Sync' : 'Sinkronkan Angka Langsung ke Halaman Ini'}</span>
+            <span>{showKeyConfig ? 'Tutup Pengaturan API Key' : (personalKey ? 'Ganti Personal API Key' : 'Sinkronkan Angka Langsung ke Halaman Ini')}</span>
           </button>
         </div>
 
         <p className="text-xs text-slate-300 leading-relaxed">
-          Setiap klik dari link bio Instagram atau WhatsApp di HP pengunjung <strong>sudah otomatis terkirim ke PostHog Cloud</strong> secara real-time. Buka konsol PostHog di bawah untuk memantau pengunjung detik ini juga:
+          Setiap klik dari link bio Instagram atau WhatsApp di HP pengunjung <strong>sudah otomatis terkirim ke PostHog Cloud</strong> secara real-time. Buka konsol PostHog di bawah untuk memantau aktivitas detik ini juga:
         </p>
 
         {/* 3 Quick Launch Action Buttons */}
@@ -514,7 +610,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
             )}
 
             <div className="text-[10px] text-slate-400 pt-1 space-y-1">
-              <div>💡 <strong>Cara dapatkan Personal API Key (30 detik):</strong></div>
+              <div>💡 <strong>Cara dapatkan Personal API Key:</strong></div>
               <div>
                 1. Buka akun PostHog Anda di{' '}
                 <a
@@ -526,7 +622,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
                   us.posthog.com/settings/user-api-keys
                 </a>
               </div>
-              <div>2. Klik tombol <strong>+ Create personal API key</strong></div>
+              <div>2. Klik tombol <strong>+ Create personal API key</strong> (pastikan centang <strong>Query ➡️ Read</strong>).</div>
               <div>3. Salin kode yang diawali dengan <code className="text-teal-300 font-mono">phx_...</code> dan tempelkan ke kolom di atas.</div>
             </div>
           </div>
@@ -588,9 +684,9 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         </div>
 
         <div className="text-[11px] text-muted flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${cloudEvents ? 'bg-emerald-500' : 'bg-teal-500'} inline-block`}></span>
+          <span className={`w-2 h-2 rounded-full ${cloudEvents ? 'bg-emerald-500 animate-pulse' : 'bg-teal-500'} inline-block`}></span>
           <span>
-            {cloudEvents ? `Cloud Sync: ${filteredEvents.length} event` : `Log Perangkat Ini: ${filteredEvents.length} event`}
+            {cloudEvents ? `Cloud Live: ${filteredEvents.length} total event` : `Log Perangkat Ini: ${filteredEvents.length} event`}
           </span>
         </div>
       </div>
@@ -612,11 +708,11 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 rounded-card bg-card border border-border shadow-soft">
           <div className="flex items-center justify-between text-muted mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Pengunjung</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Pengunjung Unik</span>
             <Users className="w-4 h-4 text-teal-brand" />
           </div>
           <div className="text-2xl font-extrabold text-foreground">{kpis.uniqueVisitors}</div>
-          <div className="text-[10px] text-muted mt-0.5">{kpis.pageViews} Total Page Views</div>
+          <div className="text-[10px] text-muted mt-0.5">{kpis.pageViews} Total Pageviews</div>
         </div>
 
         <div className="p-4 rounded-card bg-card border border-border shadow-soft">
@@ -645,6 +741,56 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
           <div className="text-2xl font-extrabold text-foreground">{kpis.waClicks}</div>
           <div className="text-[10px] text-muted mt-0.5">Konversi: {kpis.waConversionRate}%</div>
         </div>
+      </div>
+
+      {/* REAL-TIME LIVE ACTIVITY STREAM (FEED) */}
+      <div className="bg-card border border-border rounded-card-lg p-5 sm:p-6 shadow-soft space-y-4">
+        <div className="flex items-center justify-between gap-2 border-b border-border/80 pb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Activity className="w-4 h-4 text-rose-500 animate-pulse" />
+            <span>Aliran Aktivitas Pengunjung Real-Time (Live Feed)</span>
+          </h3>
+          <span className="text-[10px] text-muted font-medium bg-section px-2 py-0.5 rounded-full">
+            Update Otomatis per 8 Detik
+          </span>
+        </div>
+
+        {recentActivities.length === 0 ? (
+          <div className="py-6 text-center text-xs text-muted">
+            Belum ada aktivitas baru tercatat.
+          </div>
+        ) : (
+          <div className="divide-y divide-border/60 overflow-x-auto">
+            {recentActivities.map((act) => {
+              const actInfo = formatActivityLabel(act.eventName, act.properties);
+              const srcInfo = formatSourceBadge(act.properties?.first_touch_source || act.properties?.utm_source);
+              return (
+                <div key={act.id} className="py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-section/30 px-1 rounded transition-colors">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">{actInfo.icon}</span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-foreground truncate">
+                        {actInfo.label}
+                      </div>
+                      <div className="text-[10px] text-muted flex items-center gap-1.5 mt-0.5">
+                        <Clock className="w-3 h-3 text-muted" />
+                        <span>{formatTimeWib(act.timestamp)}</span>
+                        <span>•</span>
+                        <span>{act.properties?.visitor_id ? `ID: ${act.properties.visitor_id.substring(0, 8)}...` : 'Anonim'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    <span className={`text-[10px] px-2 py-0.5 rounded border ${srcInfo.badge}`}>
+                      {srcInfo.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* CONVERSION FUNNEL BAR */}

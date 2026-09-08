@@ -384,6 +384,9 @@ class AnalyticsClient {
           autocapture: false, // No uncontrolled DOM clicks
           disable_session_recording: false,
           persistence: 'localStorage+cookie',
+          request_batching: false, // Instant dispatch to cloud
+          flushInterval: 500,
+          flushAt: 1,
         });
         this.isPosthogInitialized = true;
         if (this.isDebug) {
@@ -426,7 +429,7 @@ class AnalyticsClient {
     // 3. PostHog dispatch if configured
     if (this.isPosthogInitialized) {
       try {
-        posthog.capture(eventName, mergedProps);
+        posthog.capture(eventName, mergedProps, { send_instantly: true });
       } catch (err) {
         console.warn('[Analytics] PostHog capture error:', err);
       }
