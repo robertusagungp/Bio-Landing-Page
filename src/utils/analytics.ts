@@ -305,7 +305,7 @@ export async function fetchPostHogCloudEvents(personalKey?: string): Promise<{ s
     const hogQuery = {
       query: {
         kind: 'HogQLQuery',
-        query: 'SELECT id, event, properties, timestamp FROM events WHERE timestamp >= now() - INTERVAL 30 DAY ORDER BY timestamp DESC LIMIT 500'
+        query: 'SELECT uuid, event, properties, timestamp FROM events WHERE timestamp >= now() - INTERVAL 30 DAY ORDER BY timestamp DESC LIMIT 500'
       }
     };
 
