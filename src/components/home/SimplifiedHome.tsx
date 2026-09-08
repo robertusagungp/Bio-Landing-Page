@@ -36,7 +36,7 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
             <img
               src="/foto-robert.png"
               alt="Robertus Agung Pradana"
-              className="w-full h-full object-cover object-[center_12%]"
+              className="w-full h-full object-cover object-[center_16%]"
               loading="eager"
             />
           </div>

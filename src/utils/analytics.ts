@@ -145,6 +145,32 @@ export function captureUtmFromUrl(): UtmProperties {
     if (term) utm.utm_term = term;
     if (document.referrer) utm.referrer = document.referrer;
 
+    // Auto-detect Instagram, WhatsApp, and social referrers if UTM not explicitly set
+    if (!utm.utm_source) {
+      const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
+      const ref = (typeof document !== 'undefined' ? document.referrer : '').toLowerCase();
+
+      if (ua.includes('instagram') || ref.includes('instagram')) {
+        utm.utm_source = 'instagram';
+        utm.utm_medium = 'bio';
+      } else if (ua.includes('whatsapp') || ref.includes('whatsapp') || ref.includes('wa.me')) {
+        utm.utm_source = 'whatsapp';
+        utm.utm_medium = 'chat';
+      } else if (ua.includes('linkedin') || ref.includes('linkedin')) {
+        utm.utm_source = 'linkedin';
+        utm.utm_medium = 'social';
+      } else if (ua.includes('tiktok') || ref.includes('tiktok')) {
+        utm.utm_source = 'tiktok';
+        utm.utm_medium = 'bio';
+      } else if (ref.includes('t.co') || ref.includes('twitter') || ua.includes('twitter')) {
+        utm.utm_source = 'twitter';
+        utm.utm_medium = 'social';
+      } else if (ref.includes('facebook') || ua.includes('fbav') || ua.includes('fban')) {
+        utm.utm_source = 'facebook';
+        utm.utm_medium = 'social';
+      }
+    }
+
     if (Object.keys(utm).length > 0) {
       // First touch (only write once)
       if (!localStorage.getItem(STORAGE_FIRST_UTM)) {

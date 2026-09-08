@@ -35,7 +35,7 @@ export const AboutRobertPage: React.FC<AboutRobertPageProps> = ({ onBackToHome }
           <img
             src="/foto-robert.png"
             alt="Robertus Agung Pradana"
-            className="w-full h-full object-cover object-[center_12%]"
+            className="w-full h-full object-cover object-[center_16%]"
           />
         </div>
         <div>
