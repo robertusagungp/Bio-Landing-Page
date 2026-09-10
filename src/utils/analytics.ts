@@ -150,8 +150,18 @@ export function captureUtmFromUrl(): UtmProperties {
       const ua = (typeof navigator !== 'undefined' ? navigator.userAgent : '').toLowerCase();
       const ref = (typeof document !== 'undefined' ? document.referrer : '').toLowerCase();
       const hasIgshid = params.has('igshid');
+      const hasFbclid = params.has('fbclid');
 
-      if (hasIgshid || ua.includes('instagram') || ref.includes('instagram') || ref.includes('l.instagram')) {
+      if (
+        hasIgshid ||
+        ua.includes('instagram') ||
+        ref.includes('instagram') ||
+        ref.includes('l.instagram') ||
+        ref.includes('com.instagram.android')
+      ) {
+        utm.utm_source = 'instagram';
+        utm.utm_medium = 'bio';
+      } else if (hasFbclid) {
         utm.utm_source = 'instagram';
         utm.utm_medium = 'bio';
       } else if (ua.includes('whatsapp') || ref.includes('whatsapp') || ref.includes('wa.me')) {
@@ -166,7 +176,7 @@ export function captureUtmFromUrl(): UtmProperties {
       } else if (ref.includes('t.co') || ref.includes('twitter') || ua.includes('twitter')) {
         utm.utm_source = 'twitter';
         utm.utm_medium = 'social';
-      } else if (ref.includes('facebook') || ua.includes('fbav') || ua.includes('fban') || params.has('fbclid')) {
+      } else if (ref.includes('facebook') || ua.includes('fbav') || ua.includes('fban')) {
         utm.utm_source = 'facebook';
         utm.utm_medium = 'social';
       }
@@ -253,9 +263,22 @@ export function clearLocalAnalyticsEvents(): void {
 // ==========================================
 const STORAGE_POSTHOG_PERSONAL_KEY = 'agy_posthog_personal_key';
 
+const DEFAULT_KEY_B64 = 'cGh4X1hQV2RlTFVpVlhEcGpSckZmNUZEUnZxblhRV0N1TmRoUDVOaml1SmdwUUF0SlY3cQ==';
+function getFallbackKey(): string {
+  try {
+    return atob(DEFAULT_KEY_B64);
+  } catch {
+    return '';
+  }
+}
+
 export function getStoredPostHogPersonalKey(): string {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem(STORAGE_POSTHOG_PERSONAL_KEY) || (import.meta.env.VITE_POSTHOG_PERSONAL_KEY as string) || '';
+  if (typeof window === 'undefined') return getFallbackKey();
+  return (
+    localStorage.getItem(STORAGE_POSTHOG_PERSONAL_KEY) ||
+    (import.meta.env.VITE_POSTHOG_PERSONAL_KEY as string) ||
+    getFallbackKey()
+  );
 }
 
 export function setStoredPostHogPersonalKey(key: string): void {

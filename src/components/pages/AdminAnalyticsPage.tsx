@@ -116,12 +116,12 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     };
   }, [isAuthenticated, personalKey, refreshKey]);
 
-  // Real-time Auto Refresh Polling (every 8 seconds if personalKey is configured)
+  // Real-time Auto Refresh Polling (every 5 seconds)
   useEffect(() => {
     if (!isAuthenticated || !personalKey) return;
     const interval = setInterval(() => {
       setRefreshKey((k) => k + 1);
-    }, 8000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [isAuthenticated, personalKey]);
 
@@ -228,13 +228,21 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     if (utmSource.includes('facebook') || utmSource.includes('fb')) return 'facebook';
 
     // 2. Check referrer headers
-    const ref = String(props.$referrer || props.referrer || '').toLowerCase();
-    if (ref.includes('instagram') || ref.includes('l.instagram.com')) return 'instagram';
+    const ref = String(props.$referrer || props.referrer || props.initial_referrer || '').toLowerCase();
+    if (ref.includes('instagram') || ref.includes('l.instagram.com') || ref.includes('com.instagram.android')) return 'instagram';
     if (ref.includes('whatsapp') || ref.includes('wa.me')) return 'whatsapp';
     if (ref.includes('linkedin')) return 'linkedin';
     if (ref.includes('tiktok')) return 'tiktok';
     if (ref.includes('twitter') || ref.includes('t.co')) return 'twitter';
     if (ref.includes('facebook')) return 'facebook';
+
+    // 3. Check browser, user agent, and URL parameters from PostHog
+    const browser = String(props.$browser || '').toLowerCase();
+    const rawUa = String(props.$raw_user_agent || props.user_agent || '').toLowerCase();
+    const currentUrl = String(props.$current_url || '').toLowerCase();
+    if (browser.includes('instagram') || rawUa.includes('instagram') || currentUrl.includes('instagram') || currentUrl.includes('fbclid')) {
+      return 'instagram';
+    }
 
     if (utmSource && utmSource !== 'direct' && utmSource !== 'undefined') return utmSource;
     return 'direct';
@@ -460,14 +468,14 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
               Owner Analytics &amp; Funnel Hub
             </h1>
             {cloudEvents && cloudEvents.length > 0 ? (
-              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-300">
+              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-300">
                 <Cloud className="w-3 h-3" />
-                PostHog Cloud Live ({cloudEvents.length} event)
+                PostHog Cloud Live ({cloudEvents.length} event) • Auto-Sync 5s
               </span>
             ) : (
               <span className="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1 border border-teal-300">
                 <Smartphone className="w-3 h-3" />
-                Log Lokal Perangkat
+                {isCloudLoading ? 'Menyambungkan Cloud...' : 'Log Lokal Perangkat'}
               </span>
             )}
           </div>
@@ -528,7 +536,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-              PostHog Cloud Stream Aktif
+              PostHog Cloud Stream &amp; Auto-Sync (5 Detik)
             </span>
             <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded border border-slate-700">
               {projectKey ? `${projectKey.substring(0, 10)}...` : 'Connected'}
