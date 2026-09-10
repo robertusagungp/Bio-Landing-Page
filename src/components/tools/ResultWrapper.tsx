@@ -5,10 +5,11 @@ import {
   MessageCircle, 
   ArrowRight, 
   RotateCcw,
-  Sparkles,
-  HelpCircle,
-  TrendingUp,
-  CheckCircle2
+  Sparkles, 
+  HelpCircle, 
+  TrendingUp, 
+  CheckCircle2,
+  Share
 } from 'lucide-react';
 import { getWhatsAppLink } from '../../utils/formatters';
 import { ShareCardModal } from './ShareCardModal';
@@ -90,12 +91,12 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
   };
 
   return (
-    <div className="max-w-[680px] mx-auto px-4 py-8 animate-in fade-in duration-300">
+    <div className="max-w-[680px] mx-auto px-4 py-6 sm:py-8 animate-in fade-in duration-300">
       {/* Top Header Actions */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between gap-4 mb-5">
         <button
           onClick={onRetake}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground py-1.5 px-3 rounded-full hover:bg-section transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground py-1.5 px-3.5 rounded-full bg-white border border-slate-200 shadow-soft hover:bg-slate-50 transition-colors"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Hitung Ulang</span>
@@ -104,30 +105,30 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={handleOpenSave}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-brand hover:bg-teal-brand/10 py-1.5 px-3 rounded-full border border-teal-brand/30 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-brand hover:bg-emerald-50 py-1.5 px-3.5 rounded-full border border-teal-brand/30 bg-white shadow-soft transition-colors"
           >
             <Bookmark className="w-3.5 h-3.5" />
-            <span>Simpan Hasil</span>
+            <span>Simpan</span>
           </button>
           
           <button
             onClick={handleOpenShare}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white hover:bg-section py-1.5 px-3 rounded-full border border-border shadow-soft transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground bg-white hover:bg-slate-50 py-1.5 px-3.5 rounded-full border border-slate-200 shadow-soft transition-colors"
           >
             <Share2 className="w-3.5 h-3.5 text-muted" />
-            <span>Share</span>
+            <span>Bagikan</span>
           </button>
         </div>
       </div>
 
       {/* Main Result Card */}
-      <div className="bg-card border border-border rounded-card-lg p-6 sm:p-8 shadow-card space-y-7">
+      <div className="bg-white border border-slate-200/90 rounded-card-lg p-6 sm:p-8 shadow-card space-y-7">
         {/* Eyebrow */}
         <div className="text-center">
           <span className="text-[11px] font-bold text-teal-brand uppercase tracking-wider block mb-1">
             Ringkasan Evaluasi Mandiri
           </span>
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight-heading">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
             {toolTitle}
           </h2>
         </div>
@@ -142,7 +143,7 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
                 {scoreNumber}
               </div>
               {scoreSublabel && (
-                <div className="text-xs text-muted font-medium mt-1">
+                <div className="text-xs text-muted font-medium mt-1.5">
                   {scoreSublabel}
                 </div>
               )}
@@ -151,9 +152,9 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
         </div>
 
         {/* LAYER 2: MEANING */}
-        <div className="p-4 rounded-card bg-section/70 border border-border/80">
+        <div className="p-4 rounded-card bg-emerald-50/80 border border-emerald-200/70">
           <div className="text-[11px] font-bold text-teal-brand uppercase tracking-wider mb-1 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
             Makna Hasil Ini
           </div>
           <p className="text-sm font-semibold text-foreground leading-relaxed">
@@ -177,16 +178,16 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
 
         {/* LAYER 4: ACTION PLAN */}
         {actionItems && actionItems.length > 0 && (
-          <div className="pt-4 border-t border-border/80 space-y-3">
+          <div className="pt-4 border-t border-slate-100 space-y-3">
             <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-sage-dark" />
+              <TrendingUp className="w-3.5 h-3.5 text-teal-brand" />
               {actionTitle}
             </div>
             <div className="space-y-2">
               {actionItems.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-2.5 p-3 rounded-xl bg-background border border-border/70 text-xs text-foreground/90 leading-relaxed"
+                  className="flex items-start gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-foreground/90 leading-relaxed"
                 >
                   <span className="w-5 h-5 rounded-full bg-teal-brand/10 text-teal-brand font-bold flex items-center justify-center shrink-0 text-[11px]">
                     {index + 1}
@@ -210,9 +211,9 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
 
       {/* SMART CROSS-TOOL NEXT STEP */}
       {recommendedTool && onSelectRecommendedTool && (
-        <div className="mt-6 p-5 rounded-card-lg bg-teal-brand text-white shadow-card">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-sage-light block mb-1">
-            Langkah Eksplorasi Berikutnya
+        <div className="mt-6 p-6 rounded-card-lg bg-gradient-to-br from-teal-brand to-[#093e37] text-white shadow-card">
+          <span className="text-[10px] font-bold tracking-widest uppercase text-emerald-300 block mb-1">
+            Rekomendasi Langkah Berikutnya
           </span>
           <h4 className="font-bold text-base sm:text-lg mb-1">
             {recommendedTool.title}
@@ -222,7 +223,7 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
           </p>
           <button
             onClick={() => onSelectRecommendedTool(recommendedTool.id)}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-white/95 text-teal-dark font-bold text-xs py-2.5 px-5 rounded-btn shadow-soft transition-all group"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-teal-brand font-bold text-xs py-2.5 px-5 rounded-btn shadow-soft transition-all group"
           >
             <span>{recommendedTool.buttonLabel}</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -231,25 +232,28 @@ export const ResultWrapper: React.FC<ResultWrapperProps> = ({
       )}
 
       {/* WHATSAPP CONSULTATION INVITATION */}
-      <div className="mt-6 p-6 rounded-card-lg bg-card border border-border text-center shadow-soft">
-        <div className="w-10 h-10 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center mx-auto mb-3">
-          <MessageCircle className="w-5 h-5 fill-current" />
+      <div className="mt-6 p-6 rounded-card-lg bg-white border border-slate-200/90 text-center shadow-card space-y-3">
+        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-1">
+          <MessageCircle className="w-5 h-5 fill-emerald-500/20" />
         </div>
-        <h4 className="text-sm font-bold text-foreground mb-1">
+        <h4 className="text-sm font-bold text-foreground">
           Punya pertanyaan tentang hasilmu?
         </h4>
-        <p className="text-xs text-muted leading-relaxed max-w-sm mx-auto mb-4">
-          Kalau kamu ingin memahami bagaimana hasil ini berkaitan dengan situasi riil keluargamu, kita bisa ngobrol santai.
+        <p className="text-xs text-muted leading-relaxed max-w-sm mx-auto">
+          Jika kamu ingin memahami bagaimana hasil ini berkaitan dengan situasi riil keluargamu, kita bisa berdiskusi santai.
         </p>
-        <a
-          href={waLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={handleWaClick}
-          className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white text-xs font-bold py-2.5 px-5 rounded-btn shadow-soft transition-colors"
-        >
-          <span>💬 Tanya Robert via WhatsApp</span>
-        </a>
+        <div className="pt-2">
+          <a
+            href={waLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleWaClick}
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold py-2.5 px-6 rounded-btn shadow-soft transition-all"
+          >
+            <MessageCircle className="w-4 h-4 fill-white/20" />
+            <span>Tanya Robert via WhatsApp</span>
+          </a>
+        </div>
       </div>
 
       {/* Modals */}

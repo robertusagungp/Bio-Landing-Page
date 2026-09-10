@@ -7,40 +7,42 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onOpenLegal, onOpenAdmin }) => {
   return (
-    <footer className="mt-12 py-8 border-t border-border/80 text-center text-xs text-muted space-y-2">
-      <div className="font-semibold text-foreground/90">
-        Robertus Agung Pradana
+    <footer className="mt-16 py-10 border-t border-slate-200/80 bg-white/40 text-center text-xs text-muted space-y-3">
+      <div className="flex items-center justify-center gap-2 font-semibold text-foreground">
+        <span>Robertus Agung Pradana</span>
+        <span className="text-muted/40">•</span>
+        <span className="text-[11px] font-normal text-muted">Data &amp; Life Readiness Hub</span>
       </div>
 
-      <div className="flex items-center justify-center gap-3 text-[11px]">
+      <div className="flex items-center justify-center gap-3 text-[11px] text-muted">
         <button
           onClick={() => onOpenLegal('privacy')}
-          className="hover:text-foreground hover:underline transition-colors"
+          className="hover:text-teal-brand transition-colors"
         >
-          Privacy
+          Kebijakan Privasi
         </button>
-        <span>•</span>
+        <span className="text-muted/40">•</span>
         <button
           onClick={() => onOpenLegal('disclaimer')}
-          className="hover:text-foreground hover:underline transition-colors"
+          className="hover:text-teal-brand transition-colors"
         >
-          Disclaimer
+          Disclaimer Etika
         </button>
         {onOpenAdmin && (
           <>
-            <span>•</span>
+            <span className="text-muted/40">•</span>
             <button
               onClick={onOpenAdmin}
-              className="hover:text-foreground hover:underline transition-colors text-muted/60"
+              className="hover:text-teal-brand transition-colors text-muted/50"
             >
-              🔒 Analytics
+              Analytics
             </button>
           </>
         )}
       </div>
 
-      <div className="text-[10px] text-muted/70 pt-1">
-        Personal Wellness &amp; Life Readiness Hub
+      <div className="text-[11px] text-muted/60 pt-1">
+        Dibuat untuk tujuan edukasi &amp; peningkatan self-awareness mandiri berbasis data.
       </div>
     </footer>
   );

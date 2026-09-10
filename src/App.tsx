@@ -235,6 +235,7 @@ export function App() {
                 onNavigateToAbout={() => handleNavigation('about')}
                 savedLifeScore={results.lifeReadiness}
                 onRetakeLifeScore={() => handleSelectTool('life-readiness')}
+                results={results}
               />
             )}
 

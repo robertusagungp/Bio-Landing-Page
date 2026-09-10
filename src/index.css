@@ -4,8 +4,8 @@
 
 @layer base {
   body {
-    background-color: #F7F4EE;
-    color: #172321;
+    background-color: #F8FAF9;
+    color: #0F172A;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -23,18 +23,18 @@ html {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F7F4EE;
+  background: #F8FAF9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #DDDAD2;
+  background: #CBD5E1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6B726E;
+  background: #94A3B8;
 }
 
 /* Accessible focus ring */
 *:focus-visible {
-  outline: 2px solid #174C45;
+  outline: 2px solid #0D5C52;
   outline-offset: 2px;
 }
