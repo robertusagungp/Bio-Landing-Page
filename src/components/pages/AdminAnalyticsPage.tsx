@@ -56,6 +56,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
   const [copiedBioLink, setCopiedBioLink] = useState<boolean>(false);
+  const [copiedAdLink, setCopiedAdLink] = useState<boolean>(false);
   const [resetCutoff, setResetCutoff] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const stored = localStorage.getItem('agy_analytics_reset_cutoff');
@@ -64,6 +65,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
   const projectKey = getPostHogProjectKey();
   const instagramBioUrl = 'https://bio-landing-page-seven.vercel.app/?utm_source=instagram&utm_medium=bio';
+  const instagramPaidAdUrl = 'https://bio-landing-page-seven.vercel.app/aman-berapa-bulan?utm_source=instagram&utm_medium=paid_social&utm_campaign=financial_runway&utm_content=reel_01';
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,7 +173,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const kpis = useMemo(() => {
     // Exclude internal admin dashboard views from public metrics
     const publicPageViews = filteredEvents.filter(
-      (e) => (e.eventName === 'page_view' || e.eventName === '$pageview') && 
+      (e) => (e.eventName === 'page_view' || e.eventName === '$pageview' || e.eventName === 'landing_view') && 
              e.properties?.page !== 'admin_analytics' && 
              e.properties?.page !== 'admin'
     );
@@ -186,22 +188,36 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     const uniqueVisitors = uniqueVisitorIds.size;
     const pageViews = publicPageViews.length;
 
+    const landingViews = filteredEvents.filter(
+      (e) => e.eventName === 'landing_view' || 
+             (e.eventName === 'page_view' && (e.properties?.page === 'aman-berapa-bulan' || e.properties?.path === '/aman-berapa-bulan'))
+    ).length;
+
     const toolStarts = filteredEvents.filter((e) => e.eventName === 'tool_started').length;
+    const step1Completions = filteredEvents.filter((e) => e.eventName === 'step_1_completed').length;
+    const step2Completions = filteredEvents.filter((e) => e.eventName === 'step_2_completed').length;
     const toolCompletions = filteredEvents.filter((e) => e.eventName === 'tool_completed').length;
+    const resultViews = filteredEvents.filter((e) => e.eventName === 'result_viewed').length;
+    const nextAssessmentClicks = filteredEvents.filter((e) => e.eventName === 'next_assessment_clicked').length;
     const waClicks = filteredEvents.filter((e) => e.eventName === 'whatsapp_clicked').length;
     const riskEdViews = filteredEvents.filter(
       (e) => e.eventName === 'risk_management_option_clicked' || e.eventName === 'financial_protection_viewed'
     ).length;
     const protectionOpens = filteredEvents.filter((e) => e.eventName === 'protection_gap_opened').length;
 
-    const completionRate = toolStarts > 0 ? Math.round((toolCompletions / toolStarts) * 100) : 0;
+    const completionRate = toolStarts > 0 ? Math.round((Math.max(toolCompletions, resultViews) / toolStarts) * 100) : 0;
     const waConversionRate = uniqueVisitors > 0 ? ((waClicks / uniqueVisitors) * 100).toFixed(1) : '0.0';
 
     return {
       uniqueVisitors,
       pageViews,
+      landingViews,
       toolStarts,
+      step1Completions,
+      step2Completions,
       toolCompletions,
+      resultViews,
+      nextAssessmentClicks,
       completionRate,
       waClicks,
       waConversionRate,
@@ -214,11 +230,24 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   const getEventSource = (props?: Record<string, any>): string => {
     if (!props) return 'direct';
     
+    // Explicit traffic_source property check
+    const explicitSource = String(props.traffic_source || '').toLowerCase();
+    if (explicitSource === 'instagram_paid') return 'instagram_paid';
+    if (explicitSource === 'instagram_bio') return 'instagram_bio';
+
     // 1. Check UTM and campaign attribution
     const utmSource = String(props.utm_source || props.last_touch_source || props.first_touch_source || '').toLowerCase();
-    if (utmSource.includes('instagram') || utmSource === 'ig' || utmSource.includes('ig_') || utmSource === 'insta') {
-      return 'instagram';
+    const utmMedium = String(props.utm_medium || props.last_touch_medium || props.first_touch_medium || '').toLowerCase();
+    const utmCampaign = String(props.utm_campaign || props.last_touch_campaign || props.first_touch_campaign || '').toLowerCase();
+
+    const isInstagram = utmSource.includes('instagram') || utmSource === 'ig' || utmSource.includes('ig_') || utmSource === 'insta';
+    if (isInstagram) {
+      if (utmMedium === 'paid_social' || (utmCampaign && utmMedium !== 'bio')) {
+        return 'instagram_paid';
+      }
+      return 'instagram_bio';
     }
+
     if (utmSource.includes('whatsapp') || utmSource.includes('wa.me') || utmSource === 'wa') {
       return 'whatsapp';
     }
@@ -229,7 +258,10 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
     // 2. Check referrer headers
     const ref = String(props.$referrer || props.referrer || props.initial_referrer || '').toLowerCase();
-    if (ref.includes('instagram') || ref.includes('l.instagram.com') || ref.includes('com.instagram.android')) return 'instagram';
+    if (ref.includes('instagram') || ref.includes('l.instagram.com') || ref.includes('com.instagram.android')) {
+      if (utmMedium === 'paid_social' || utmCampaign) return 'instagram_paid';
+      return 'instagram_bio';
+    }
     if (ref.includes('whatsapp') || ref.includes('wa.me')) return 'whatsapp';
     if (ref.includes('linkedin')) return 'linkedin';
     if (ref.includes('tiktok')) return 'tiktok';
@@ -240,8 +272,9 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
     const browser = String(props.$browser || '').toLowerCase();
     const rawUa = String(props.$raw_user_agent || props.user_agent || '').toLowerCase();
     const currentUrl = String(props.$current_url || '').toLowerCase();
-    if (browser.includes('instagram') || rawUa.includes('instagram') || currentUrl.includes('instagram') || currentUrl.includes('fbclid')) {
-      return 'instagram';
+    if (browser.includes('instagram') || rawUa.includes('instagram') || currentUrl.includes('instagram')) {
+      if (utmMedium === 'paid_social' || currentUrl.includes('paid_social') || utmCampaign) return 'instagram_paid';
+      return 'instagram_bio';
     }
 
     if (utmSource && utmSource !== 'direct' && utmSource !== 'undefined') return utmSource;
@@ -262,7 +295,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       if (!map[src]) {
         map[src] = { visitors: 0, starts: 0, waClicks: 0 };
       }
-      if (ev.eventName === 'page_view' || ev.eventName === '$pageview') map[src].visitors++;
+      if (ev.eventName === 'page_view' || ev.eventName === '$pageview' || ev.eventName === 'landing_view') map[src].visitors++;
       if (ev.eventName === 'tool_started') map[src].starts++;
       if (ev.eventName === 'whatsapp_clicked') map[src].waClicks++;
     });
@@ -273,6 +306,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
   // Tool Performance Breakdown
   const toolStats = useMemo(() => {
     const map: Record<string, { starts: number; completions: number; wa: number }> = {
+      'runway_calculator': { starts: 0, completions: 0, wa: 0 },
       'life_readiness': { starts: 0, completions: 0, wa: 0 },
       'lifestyle_age': { starts: 0, completions: 0, wa: 0 },
       'emergency_checker': { starts: 0, completions: 0, wa: 0 },
@@ -287,7 +321,7 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       const tool = (ev.properties?.tool_name || ev.properties?.source_tool || '').toLowerCase().replace(/[- ]/g, '_');
       if (map[tool]) {
         if (ev.eventName === 'tool_started') map[tool].starts++;
-        if (ev.eventName === 'tool_completed') map[tool].completions++;
+        if (ev.eventName === 'tool_completed' || ev.eventName === 'result_viewed') map[tool].completions++;
         if (ev.eventName === 'whatsapp_clicked') map[tool].wa++;
       }
     });
@@ -296,6 +330,33 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       const rate = stat.starts > 0 ? Math.round((stat.completions / stat.starts) * 100) : 0;
       return { id, ...stat, rate };
     }).sort((a, b) => b.starts - a.starts);
+  }, [filteredEvents]);
+
+  // Campaign & Content Performance Breakdown (UTM Campaign & Content)
+  const campaignStats = useMemo(() => {
+    const map: Record<string, { visitors: number; starts: number; waClicks: number; content: Set<string> }> = {};
+
+    filteredEvents.forEach((ev) => {
+      const camp = ev.properties?.utm_campaign || ev.properties?.last_touch_campaign || ev.properties?.first_touch_campaign;
+      if (!camp) return;
+      const content = ev.properties?.utm_content || ev.properties?.last_touch_content || '';
+      
+      if (!map[camp]) {
+        map[camp] = { visitors: 0, starts: 0, waClicks: 0, content: new Set() };
+      }
+      if (content) map[camp].content.add(content);
+      if (ev.eventName === 'page_view' || ev.eventName === '$pageview' || ev.eventName === 'landing_view') map[camp].visitors++;
+      if (ev.eventName === 'tool_started') map[camp].starts++;
+      if (ev.eventName === 'whatsapp_clicked') map[camp].waClicks++;
+    });
+
+    return Object.entries(map).map(([camp, stat]) => ({
+      campaign: camp,
+      visitors: stat.visitors,
+      starts: stat.starts,
+      waClicks: stat.waClicks,
+      contents: Array.from(stat.content).join(', ') || '-',
+    })).sort((a, b) => b.visitors - a.visitors);
   }, [filteredEvents]);
 
   // Recent Live Activity Stream (Public events only, excluding admin noise)
@@ -309,44 +370,85 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
       .slice(0, 15);
   }, [filteredEvents]);
 
-  // Conversion Funnel Data (starts from 0)
+  // Dedicated Conversion Funnel Data (starts from 0)
+  const landingBase = Math.max(kpis.uniqueVisitors, kpis.landingViews);
+  const completedCount = Math.max(kpis.toolCompletions, kpis.resultViews);
   const funnelSteps = [
     { 
-      label: '1. Pengunjung Unik (Unique Visitors)', 
-      count: kpis.uniqueVisitors, 
-      pct: kpis.uniqueVisitors > 0 ? 100 : 0 
+      label: '1. Pengunjung Landing / Hub (Total Visitors)', 
+      count: landingBase, 
+      pct: landingBase > 0 ? 100 : 0 
     },
     { 
-      label: '2. Mulai Assessment (Tool Started)', 
+      label: '2. Mulai Isi Kalkulator / Tool (Tool Started)', 
       count: kpis.toolStarts, 
-      pct: kpis.uniqueVisitors > 0 ? Math.round((kpis.toolStarts / kpis.uniqueVisitors) * 100) : 0,
+      pct: landingBase > 0 ? Math.round((kpis.toolStarts / landingBase) * 100) : 0,
     },
     { 
-      label: '3. Menyelesaikan Hasil (Completed)', 
-      count: kpis.toolCompletions, 
-      pct: kpis.toolStarts > 0 ? Math.round((kpis.toolCompletions / kpis.toolStarts) * 100) : 0,
+      label: '3. Input Lengkap (Step Completed)', 
+      count: Math.max(kpis.step1Completions, kpis.step2Completions, completedCount), 
+      pct: kpis.toolStarts > 0 ? Math.round((Math.max(kpis.step1Completions, kpis.step2Completions, completedCount) / kpis.toolStarts) * 100) : 0,
     },
     { 
-      label: '4. Membaca Edukasi Risiko', 
-      count: kpis.riskEdViews, 
-      pct: kpis.toolCompletions > 0 ? Math.round((kpis.riskEdViews / kpis.toolCompletions) * 100) : 0,
+      label: '4. Melihat Hasil Rekomendasi (Result Viewed)', 
+      count: completedCount, 
+      pct: kpis.toolStarts > 0 ? Math.round((completedCount / kpis.toolStarts) * 100) : 0,
     },
     { 
-      label: '5. Membuka Protection Gap', 
-      count: kpis.protectionOpens, 
-      pct: kpis.riskEdViews > 0 ? Math.round((kpis.protectionOpens / kpis.riskEdViews) * 100) : 0,
+      label: '5. Lanjut Evaluasi Kesiapan (Next Assessment)', 
+      count: kpis.nextAssessmentClicks, 
+      pct: completedCount > 0 ? Math.round((kpis.nextAssessmentClicks / completedCount) * 100) : 0,
     },
     { 
-      label: '6. Konsultasi WhatsApp Clicked', 
+      label: '6. Konsultasi WhatsApp (WhatsApp Clicked)', 
       count: kpis.waClicks, 
-      pct: kpis.toolCompletions > 0 ? Math.round((kpis.waClicks / kpis.toolCompletions) * 100) : 0,
+      pct: completedCount > 0 ? Math.round((kpis.waClicks / completedCount) * 100) : 0,
     },
   ];
 
   const formatActivityLabel = (evName: string, props?: Record<string, any>) => {
     switch (evName) {
+      case 'landing_view':
+        return { 
+          label: 'Membuka Landing Page (Aman Berapa Bulan)', 
+          icon: '👁️', 
+          badge: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold' 
+        };
+      case 'step_1_completed':
+        return { 
+          label: '✓ Step 1 Selesai (Dana Likuid)', 
+          icon: '✍️', 
+          badge: 'bg-blue-50 text-blue-700 border-blue-200' 
+        };
+      case 'step_2_completed':
+        return { 
+          label: '✓ Step 2 Selesai (Pengeluaran Wajib)', 
+          icon: '✍️', 
+          badge: 'bg-blue-50 text-blue-700 border-blue-200' 
+        };
+      case 'result_viewed': {
+        const bucketVal = String(props?.runway_bucket || '');
+        const bucketLabel = bucketVal
+          ? bucketVal.replace('lt_1', '<1 bln').replace('1_3', '1–3 bln').replace('3_6', '3–6 bln').replace('6_12', '6–12 bln').replace('12_plus', '12+ bln')
+          : '';
+        return { 
+          label: bucketLabel ? `Hasil Dilihat (Kategori: ${bucketLabel})` : 'Hasil Kalkulasi Dilihat', 
+          icon: '📊', 
+          badge: 'bg-purple-50 text-purple-700 border-purple-200 font-semibold' 
+        };
+      }
+      case 'next_assessment_clicked':
+        return { 
+          label: '➡️ Lanjut ke Life Readiness Score', 
+          icon: '🚀', 
+          badge: 'bg-teal-50 text-teal-800 border-teal-200 font-semibold' 
+        };
       case 'whatsapp_clicked':
-        return { label: 'Konsultasi WhatsApp', icon: '💬', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        return { 
+          label: 'Konsultasi WhatsApp', 
+          icon: '💬', 
+          badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold' 
+        };
       case 'page_view':
         return { 
           label: props?.page ? `Kunjungan Halaman (${props.page})` : 'Kunjungan Halaman', 
@@ -355,13 +457,13 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         };
       case 'tool_started':
         return { 
-          label: props?.tool_name ? `Mulai Asesmen (${props.tool_name})` : 'Mulai Asesmen', 
+          label: props?.tool_name === 'runway_calculator' ? 'Mulai Kalkulator (Runway)' : (props?.tool_name ? `Mulai Asesmen (${props.tool_name})` : 'Mulai Asesmen'), 
           icon: '🚀', 
           badge: 'bg-teal-50 text-teal-700 border-teal-200' 
         };
       case 'tool_completed':
         return { 
-          label: props?.tool_name ? `Selesai Asesmen (${props.tool_name})` : 'Selesai Asesmen', 
+          label: props?.tool_name === 'runway_calculator' ? 'Kalkulasi Runway Selesai' : (props?.tool_name ? `Selesai Asesmen (${props.tool_name})` : 'Selesai Asesmen'), 
           icon: '🏁', 
           badge: 'bg-purple-50 text-purple-700 border-purple-200' 
         };
@@ -378,8 +480,11 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
   const formatSourceBadge = (rawSrc?: string) => {
     const s = String(rawSrc || 'direct').toLowerCase();
-    if (s.includes('instagram') || s === 'ig' || s.includes('ig_') || s === 'insta') {
-      return { label: 'INSTAGRAM', badge: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
+    if (s === 'instagram_paid' || s.includes('paid')) {
+      return { label: 'IG (Paid Ad)', badge: 'bg-purple-50 text-purple-700 border-purple-200 font-bold' };
+    }
+    if (s === 'instagram_bio' || s.includes('instagram') || s === 'ig') {
+      return { label: 'IG (Bio)', badge: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
     }
     if (s.includes('whatsapp') || s.includes('wa.me') || s === 'wa') {
       return { label: 'WHATSAPP', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold' };
@@ -661,35 +766,74 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
         )}
       </div>
 
-      {/* INSTAGRAM BIO LINK ATTRIBUTION CARD */}
-      <div className="p-4 rounded-card bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="font-bold flex items-center gap-1.5 text-amber-900">
-            <Smartphone className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>Link Khusus Bio Instagram (Garansi 100% Terdeteksi)</span>
+      {/* INSTAGRAM PAID AD & BIO LINK ATTRIBUTION CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Paid Ad Deep Link Card */}
+        <div className="p-4 rounded-card bg-purple-50/80 border border-purple-200 text-xs text-purple-950 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-bold flex items-center gap-1.5 text-purple-900">
+              <Sparkles className="w-4 h-4 text-purple-700 shrink-0" />
+              <span>Link Khusus Iklan Ads (Deep-Link)</span>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(instagramPaidAdUrl);
+                setCopiedAdLink(true);
+                setTimeout(() => setCopiedAdLink(false), 2500);
+              }}
+              className="text-[11px] font-bold text-purple-800 bg-purple-200/80 hover:bg-purple-200 px-2.5 py-1 rounded transition-colors inline-flex items-center gap-1 shrink-0"
+            >
+              {copiedAdLink ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-700" />
+                  <span className="text-emerald-800 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Salin Link Ads</span>
+                </>
+              )}
+            </button>
           </div>
-          <button
-            onClick={handleCopyBioLink}
-            className="text-[11px] font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-2.5 py-1 rounded transition-colors inline-flex items-center gap-1 shrink-0"
-          >
-            {copiedBioLink ? (
-              <>
-                <Check className="w-3 h-3 text-emerald-700" />
-                <span className="text-emerald-800 font-bold">Tersalin!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3 h-3" />
-                <span>Salin Link</span>
-              </>
-            )}
-          </button>
+          <p className="text-[11px] leading-relaxed text-purple-900">
+            Gunakan URL ini sebagai <strong>Website Destination URL</strong> di Meta Ads Manager agar langsung menuju kalkulator runway tanpa gate:
+          </p>
+          <div className="p-2 rounded bg-white border border-purple-300/80 font-mono text-[10px] text-purple-900 break-all select-all flex items-center justify-between gap-2">
+            <span>{instagramPaidAdUrl}</span>
+          </div>
         </div>
-        <p className="text-[11px] leading-relaxed text-amber-900">
-          Browser bawaan Instagram di HP (In-App WebView) sering kali memblokir informasi peramban karena aturan privasi Apple/Android. Pasang link berikut di bio Instagram Anda agar seluruh kunjungan <strong>pasti tercatat sebagai INSTAGRAM (bio)</strong>:
-        </p>
-        <div className="p-2 rounded bg-white border border-amber-300/80 font-mono text-[11px] text-amber-900 break-all select-all flex items-center justify-between gap-2">
-          <span>{instagramBioUrl}</span>
+
+        {/* Bio Link Card */}
+        <div className="p-4 rounded-card bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-bold flex items-center gap-1.5 text-amber-900">
+              <Smartphone className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>Link Khusus Bio Instagram (Organik)</span>
+            </div>
+            <button
+              onClick={handleCopyBioLink}
+              className="text-[11px] font-bold text-amber-800 bg-amber-200/80 hover:bg-amber-200 px-2.5 py-1 rounded transition-colors inline-flex items-center gap-1 shrink-0"
+            >
+              {copiedBioLink ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-700" />
+                  <span className="text-emerald-800 font-bold">Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3 h-3" />
+                  <span>Salin Link Bio</span>
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-[11px] leading-relaxed text-amber-900">
+            Pasang link ini di profil bio Instagram agar kunjungan organik terdeteksi sebagai <strong>INSTAGRAM (Bio)</strong>:
+          </p>
+          <div className="p-2 rounded bg-white border border-amber-300/80 font-mono text-[10px] text-amber-900 break-all select-all flex items-center justify-between gap-2">
+            <span>{instagramBioUrl}</span>
+          </div>
         </div>
       </div>
 
@@ -850,10 +994,15 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
 
       {/* CONVERSION FUNNEL BAR */}
       <div className="bg-card border border-border rounded-card-lg p-5 sm:p-6 shadow-soft space-y-4">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-teal-brand" />
-          Funnel Konversi Keseluruhan
-        </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-border/80 pb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-teal-brand" />
+            <span>Funnel Konversi Keseluruhan</span>
+          </h3>
+          <span className="text-[10px] text-muted bg-section px-2.5 py-0.5 rounded-full border border-border font-medium">
+            Tracking funnel baru aktif sejak 11 September 2026
+          </span>
+        </div>
 
         <div className="space-y-3">
           {funnelSteps.map((step, idx) => (
@@ -955,6 +1104,56 @@ export const AdminAnalyticsPage: React.FC<AdminAnalyticsPageProps> = ({ onBackTo
                     <td className="py-2.5 px-3 text-center text-muted">{stat.starts}</td>
                     <td className="py-2.5 pl-3 text-right font-bold text-teal-brand">
                       {stat.waClicks > 0 ? `💬 ${stat.waClicks}` : '0'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* CAMPAIGN & AD CONTENT BREAKDOWN */}
+      <div className="bg-card border border-border rounded-card-lg p-5 sm:p-6 shadow-soft space-y-4">
+        <div className="flex items-center justify-between gap-2 border-b border-border/80 pb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-teal-brand" />
+            <span>Performa Kampanye &amp; Iklan (UTM Campaign &amp; Content)</span>
+          </h3>
+          <span className="text-[10px] text-muted font-medium bg-section px-2.5 py-0.5 rounded-full">
+            A/B Test Creative
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          {campaignStats.length === 0 ? (
+            <div className="py-6 text-center text-xs text-muted">
+              Belum ada data parameter kampanye (utm_campaign) yang tercatat.
+            </div>
+          ) : (
+            <table className="w-full text-xs text-left">
+              <thead className="border-b border-border/80 text-muted uppercase font-bold text-[10px]">
+                <tr>
+                  <th className="py-2.5 pr-4">Nama Kampanye</th>
+                  <th className="py-2.5 px-3">Ad Creative (Content)</th>
+                  <th className="py-2.5 px-3 text-center">Visitors</th>
+                  <th className="py-2.5 px-3 text-center">Starts</th>
+                  <th className="py-2.5 pl-3 text-right">WA Clicks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {campaignStats.map((c) => (
+                  <tr key={c.campaign} className="hover:bg-section/40">
+                    <td className="py-2.5 pr-4 font-semibold text-foreground">
+                      {c.campaign}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-muted">
+                      {c.contents}
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-muted">{c.visitors}</td>
+                    <td className="py-2.5 px-3 text-center text-muted">{c.starts}</td>
+                    <td className="py-2.5 pl-3 text-right font-bold text-teal-brand">
+                      {c.waClicks > 0 ? `💬 ${c.waClicks}` : '0'}
                     </td>
                   </tr>
                 ))}

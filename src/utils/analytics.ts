@@ -6,18 +6,24 @@ import posthog from 'posthog-js';
 
 export type AnalyticsEventName =
   | 'page_view'
+  | 'landing_view'
   | 'life_score_cta_clicked'
   | 'tool_started'
+  | 'step_1_completed'
+  | 'step_2_completed'
   | 'tool_question_viewed'
   | 'tool_question_answered'
   | 'tool_question_back'
   | 'tool_completed'
+  | 'result_viewed'
   | 'tool_abandoned'
   | 'risk_education_viewed'
   | 'risk_management_option_clicked'
   | 'financial_protection_viewed'
   | 'protection_gap_opened'
+  | 'next_assessment_clicked'
   | 'whatsapp_clicked'
+  | 'lead_confirmed'
   | 'share_modal_opened'
   | 'share_link_copied'
   | 'share_whatsapp_sent'
@@ -76,16 +82,75 @@ export function getOrCreateSessionId(): string {
 }
 
 // ==========================================
+// CLIENT CONTEXT & DEVICE HELPERS
+// ==========================================
+const STORAGE_SESSION_START = 'agy_session_start_time';
+
+export function getSessionElapsedSeconds(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    let startStr = sessionStorage.getItem(STORAGE_SESSION_START);
+    if (!startStr) {
+      startStr = Date.now().toString();
+      sessionStorage.setItem(STORAGE_SESSION_START, startStr);
+    }
+    const start = parseInt(startStr, 10);
+    return Math.max(0, Math.floor((Date.now() - start) / 1000));
+  } catch {
+    return 0;
+  }
+}
+
+export function detectInAppInstagram(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /Instagram/i.test(ua) || ua.includes('FB_IAB') || ua.includes('FBAN') || ua.includes('FBAV');
+}
+
+export function detectDeviceType(): 'mobile' | 'tablet' | 'desktop' {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const ua = navigator.userAgent;
+  if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+    return 'tablet';
+  }
+  if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(ua)) {
+    return 'mobile';
+  }
+  return 'desktop';
+}
+
+export function detectBrowser(): string {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const ua = navigator.userAgent;
+  if (/Instagram/i.test(ua)) return 'Instagram InApp';
+  if (/FBAN|FBAV/i.test(ua)) return 'Facebook InApp';
+  if (/WhatsApp/i.test(ua)) return 'WhatsApp InApp';
+  if (/Chrome/i.test(ua) && !/Edge|Edg|OPR/i.test(ua)) return 'Chrome';
+  if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return 'Safari';
+  if (/Firefox/i.test(ua)) return 'Firefox';
+  if (/Edge|Edg/i.test(ua)) return 'Edge';
+  return 'Other';
+}
+
+// ==========================================
 // SENSITIVE KEYS DENYLIST (STRICT PRIVACY)
 // ==========================================
 const SENSITIVE_KEY_PATTERNS = [
   /salary/i,
-  /income_amount/i,
-  /expense_amount/i,
-  /savings_amount/i,
-  /liquid_amount/i,
+  /income/i,
+  /expense/i,
+  /savings/i,
+  /liquid/i,
   /nominal/i,
   /rupiah/i,
+  /funds/i,
+  /amount/i,
+  /dana/i,
+  /pengeluaran/i,
+  /tabungan/i,
+  /cash/i,
+  /biaya/i,
+  /uang/i,
   /phone/i,
   /email/i,
   /name/i,
@@ -107,7 +172,7 @@ function sanitizeProperties(props?: Record<string, any>): Record<string, any> {
     }
 
     // Don't log full object/array of user answers
-    if (key === 'userProfile' || key === 'answers' || key === 'inputValues') {
+    if (key === 'userProfile' || key === 'answers' || key === 'inputValues' || key === 'rawInputs') {
       continue;
     }
 
@@ -436,22 +501,46 @@ class AnalyticsClient {
   public track(eventName: AnalyticsEventName, properties?: Record<string, any>) {
     const safeProps = sanitizeProperties(properties);
     const { firstTouch, lastTouch } = getAttribution();
+    const nowIso = new Date().toISOString();
+
+    const sourceVal = String(lastTouch.utm_source || firstTouch.utm_source || 'direct').toLowerCase();
+    const mediumVal = String(lastTouch.utm_medium || firstTouch.utm_medium || '').toLowerCase();
+    const hasCampaign = !!(lastTouch.utm_campaign || firstTouch.utm_campaign);
+    const isPaidInsta = (sourceVal.includes('instagram') || sourceVal === 'ig') && (mediumVal === 'paid_social' || (hasCampaign && mediumVal !== 'bio'));
+    const trafficSource = isPaidInsta
+      ? 'instagram_paid'
+      : (sourceVal.includes('instagram') || sourceVal === 'ig')
+      ? 'instagram_bio'
+      : sourceVal;
 
     const mergedProps = {
-      ...safeProps,
+      event_name: eventName,
+      timestamp: nowIso,
       visitor_id: getOrCreateVisitorId(),
       session_id: getOrCreateSessionId(),
+      path: typeof window !== 'undefined' ? window.location.pathname : '/',
+      referrer: typeof document !== 'undefined' ? (document.referrer || lastTouch.referrer || firstTouch.referrer || undefined) : undefined,
+      traffic_source: trafficSource,
       utm_source: lastTouch.utm_source || firstTouch.utm_source || undefined,
       utm_medium: lastTouch.utm_medium || firstTouch.utm_medium || undefined,
       utm_campaign: lastTouch.utm_campaign || firstTouch.utm_campaign || undefined,
+      utm_content: lastTouch.utm_content || firstTouch.utm_content || undefined,
+      utm_term: lastTouch.utm_term || firstTouch.utm_term || undefined,
       first_touch_source: firstTouch.utm_source || 'direct',
       first_touch_medium: firstTouch.utm_medium,
       first_touch_campaign: firstTouch.utm_campaign,
+      first_touch_content: firstTouch.utm_content,
       last_touch_source: lastTouch.utm_source || 'direct',
       last_touch_medium: lastTouch.utm_medium,
       last_touch_campaign: lastTouch.utm_campaign,
-      client_time: new Date().toISOString(),
+      last_touch_content: lastTouch.utm_content,
+      device_type: detectDeviceType(),
+      browser: detectBrowser(),
+      is_instagram_in_app_browser: detectInAppInstagram(),
+      session_elapsed_seconds: getSessionElapsedSeconds(),
+      client_time: nowIso,
       screen_width: typeof window !== 'undefined' ? window.innerWidth : undefined,
+      ...safeProps,
     };
 
     // 1. Console log in debug mode
@@ -484,6 +573,14 @@ class AnalyticsClient {
     this.track('page_view', {
       page: pageName,
       path: typeof window !== 'undefined' ? window.location.pathname : '/',
+      ...properties,
+    });
+  }
+
+  public landing(pageName: string = 'aman-berapa-bulan', properties?: Record<string, any>) {
+    this.track('landing_view', {
+      page: pageName,
+      path: typeof window !== 'undefined' ? window.location.pathname : `/${pageName}`,
       ...properties,
     });
   }

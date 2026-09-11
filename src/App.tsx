@@ -22,6 +22,7 @@ import { ToolsCatalogPage } from './components/pages/ToolsCatalogPage';
 import { AboutRobertPage } from './components/pages/AboutRobertPage';
 import { FinancialProtectionPage } from './components/pages/FinancialProtectionPage';
 import { AdminAnalyticsPage } from './components/pages/AdminAnalyticsPage';
+import { AmanBerapaBulanPage } from './components/pages/AmanBerapaBulanPage';
 import { LegalModal } from './components/pages/LegalModal';
 
 // Rich Tool Runners (100% Preserved + Protection Gap)
@@ -35,17 +36,23 @@ import { FamilyReadinessRunner } from './components/tools/runners/FamilyReadines
 import { HealthChecklistRunner } from './components/tools/runners/HealthChecklistRunner';
 import { ProtectionGapRunner } from './components/tools/runners/ProtectionGapRunner';
 
-function getInitialRoute(): { view: 'home' | 'tools' | 'about' | 'education' | 'admin'; tool: ActiveToolId | null } {
+export type AppViewMode = 'home' | 'tools' | 'about' | 'education' | 'admin' | 'runway';
+
+function getInitialRoute(): { view: AppViewMode; tool: ActiveToolId | null } {
   if (typeof window === 'undefined') return { view: 'home', tool: null };
   try {
     const params = new URLSearchParams(window.location.search);
     const adminParam = params.get('admin');
     const toolParam = params.get('tool');
     const eduParam = params.get('edu');
-    const path = window.location.pathname;
+    const viewParam = params.get('view') || params.get('landing') || params.get('page');
+    const path = window.location.pathname.toLowerCase();
 
     if (adminParam === 'analytics' || path === '/admin' || path === '/admin/analytics') {
       return { view: 'admin', tool: null };
+    }
+    if (path === '/aman-berapa-bulan' || path.startsWith('/aman-berapa-bulan') || viewParam === 'runway' || viewParam === 'aman-berapa-bulan') {
+      return { view: 'runway', tool: null };
     }
     if (toolParam) {
       return { view: 'home', tool: toolParam as ActiveToolId };
@@ -64,7 +71,7 @@ export function App() {
   const [profile, setProfile] = useState<UserProfile>(getStoredProfile());
   const [results, setResults] = useState<StoredResults>(getStoredResults());
   const [activeTool, setActiveTool] = useState<ActiveToolId | null>(initialRoute.tool);
-  const [currentView, setCurrentView] = useState<'home' | 'tools' | 'about' | 'education' | 'admin'>(initialRoute.view);
+  const [currentView, setCurrentView] = useState<AppViewMode>(initialRoute.view);
   const [legalModal, setLegalModal] = useState<'privacy' | 'disclaimer' | null>(null);
 
   // Sync profile & results updates
@@ -123,9 +130,17 @@ export function App() {
     window.addEventListener('agy_navigate_view', handleViewChange);
     window.addEventListener('agy_navigate_tool', handleToolChange);
 
+    const handlePopState = () => {
+      const route = getInitialRoute();
+      setCurrentView(route.view);
+      setActiveTool(route.tool);
+    };
+    window.addEventListener('popstate', handlePopState);
+
     return () => {
       window.removeEventListener('agy_navigate_view', handleViewChange);
       window.removeEventListener('agy_navigate_tool', handleToolChange);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, []);
 
@@ -139,16 +154,28 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNavigation = (view: 'home' | 'tools' | 'about') => {
+  const handleNavigation = (view: AppViewMode) => {
     setCurrentView(view);
     setActiveTool(null);
+    if (typeof window !== 'undefined' && window.history) {
+      const currentQuery = window.location.search;
+      if (view === 'runway') {
+        window.history.pushState({}, '', '/aman-berapa-bulan' + currentQuery);
+      } else if (view === 'home') {
+        window.history.pushState({}, '', '/' + currentQuery);
+      } else if (view === 'admin') {
+        window.history.pushState({}, '', '/admin' + currentQuery);
+      }
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground antialiased font-sans">
-      {/* Minimal Top Header */}
-      <Navbar onNavigate={handleNavigation} currentView={currentView} />
+      {/* Minimal Top Header (Hidden on runway page to maintain ad scent) */}
+      {currentView !== 'runway' && (
+        <Navbar onNavigate={handleNavigation} currentView={currentView} />
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1">
@@ -233,6 +260,7 @@ export function App() {
                 onSelectTool={handleSelectTool}
                 onNavigateToTools={() => handleNavigation('tools')}
                 onNavigateToAbout={() => handleNavigation('about')}
+                onNavigateToRunway={() => handleNavigation('runway')}
                 savedLifeScore={results.lifeReadiness}
                 onRetakeLifeScore={() => handleSelectTool('life-readiness')}
                 results={results}
@@ -270,9 +298,15 @@ export function App() {
             {currentView === 'admin' && (
               <AdminAnalyticsPage
                 onBackToHome={() => {
-                  setCurrentView('home');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  handleNavigation('home');
                 }}
+              />
+            )}
+
+            {currentView === 'runway' && (
+              <AmanBerapaBulanPage
+                onNavigateToHome={() => handleNavigation('home')}
+                onNavigateToTool={handleSelectTool}
               />
             )}
           </>
@@ -280,12 +314,11 @@ export function App() {
       </main>
 
       {/* Minimal Clean Footer */}
-      {!activeTool && currentView !== 'admin' && (
+      {!activeTool && currentView !== 'admin' && currentView !== 'runway' && (
         <Footer 
           onOpenLegal={(type) => setLegalModal(type)}
           onOpenAdmin={() => {
-            setCurrentView('admin');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            handleNavigation('admin');
           }}
         />
       )}

@@ -74,12 +74,35 @@ export const getScoreCategory = (score: number): {
   };
 };
 
+export const formatRupiahInput = (value: string | number): string => {
+  if (value === '' || value === undefined || value === null) return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (!digits) return '';
+  return parseInt(digits, 10).toLocaleString('id-ID');
+};
+
+export const parseRupiahInput = (raw: string | number): number => {
+  if (typeof raw === 'number') return isNaN(raw) ? 0 : raw;
+  const digits = String(raw).replace(/\D/g, '');
+  if (!digits) return 0;
+  return parseInt(digits, 10);
+};
+
 const WA_NUMBER = '6287797877931';
 
-export const getWhatsAppLink = (context?: 'life-readiness' | 'financial-health' | 'emergency' | 'lifestyle' | 'medical' | 'family' | 'default'): string => {
+export const getWhatsAppLink = (
+  context?: 'life-readiness' | 'financial-health' | 'emergency' | 'lifestyle' | 'medical' | 'family' | 'runway' | 'default',
+  extraInfo?: { bucketLabel?: string }
+): string => {
   let message = 'Halo Kak Robert, saya baru mencoba salah satu tools di website dan ingin berdiskusi mengenai hasil saya.';
   
-  if (context === 'life-readiness') {
+  if (context === 'runway') {
+    if (extraInfo?.bucketLabel) {
+      message = `Halo Kak Robert, saya baru mencoba kalkulator masa aman finansial dan ingin berdiskusi mengenai hasil saya (Kategori: ${extraInfo.bucketLabel}).`;
+    } else {
+      message = 'Halo Kak Robert, saya baru mencoba kalkulator masa aman finansial dan ingin berdiskusi mengenai hasil saya.';
+    }
+  } else if (context === 'life-readiness') {
     message = 'Halo Kak Robert, saya sudah mencoba Life Readiness Score dan ingin memahami hasil saya lebih lanjut.';
   } else if (context === 'financial-health') {
     message = 'Halo Kak Robert, saya sudah mencoba Financial Health Score dan ingin berdiskusi mengenai hasilnya.';
@@ -95,3 +118,4 @@ export const getWhatsAppLink = (context?: 'life-readiness' | 'financial-health' 
 
   return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`;
 };
+

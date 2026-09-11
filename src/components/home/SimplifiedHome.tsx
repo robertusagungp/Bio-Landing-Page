@@ -21,6 +21,7 @@ interface SimplifiedHomeProps {
   onSelectTool: (toolId: ActiveToolId) => void;
   onNavigateToTools: () => void;
   onNavigateToAbout: () => void;
+  onNavigateToRunway?: () => void;
   savedLifeScore?: LifeReadinessResult;
   onRetakeLifeScore: () => void;
   results?: StoredResults;
@@ -42,6 +43,7 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
   onSelectTool,
   onNavigateToTools,
   onNavigateToAbout,
+  onNavigateToRunway,
   savedLifeScore,
   onRetakeLifeScore,
   results,
@@ -214,6 +216,42 @@ export const SimplifiedHome: React.FC<SimplifiedHomeProps> = ({
             <span>Tentang Saya</span>
             <ChevronRight className="w-3.5 h-3.5 text-muted" />
           </button>
+        </div>
+      </section>
+
+      {/* 1.5. CAMPAIGN DISCOVERY CARD: AMAN BERAPA BULAN */}
+      <section>
+        <div 
+          onClick={() => {
+            if (onNavigateToRunway) {
+              onNavigateToRunway();
+            } else {
+              window.dispatchEvent(new CustomEvent('agy_navigate_view', { detail: 'runway' }));
+            }
+          }}
+          className="cursor-pointer group relative overflow-hidden rounded-card-lg bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-emerald-50/90 border border-emerald-300/80 p-4 sm:p-5 hover:border-teal-brand transition-all shadow-sm hover:shadow-soft"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-teal-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                <Sparkles className="w-3 h-3 text-emerald-700" />
+                <span>Kalkulator Cepat • ±30 Detik</span>
+              </div>
+              <h3 className="text-sm sm:text-base font-extrabold text-foreground group-hover:text-teal-brand transition-colors">
+                Kalau pemasukan berhenti hari ini, kamu aman berapa bulan?
+              </h3>
+              <p className="text-xs text-muted leading-relaxed">
+                Ketahui estimasi ketahanan finansialmu berdasarkan dana likuid dan pengeluaran wajib bulanan.
+              </p>
+            </div>
+
+            <div className="shrink-0 self-start sm:self-auto">
+              <span className="inline-flex items-center gap-1.5 bg-teal-brand group-hover:bg-teal-light text-white text-xs font-bold py-2 px-3.5 rounded-btn shadow-sm transition-all group-hover:translate-x-0.5">
+                <span>Hitung Sekarang</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
