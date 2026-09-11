@@ -319,7 +319,7 @@ export const AmanBerapaBulanPage: React.FC<AmanBerapaBulanPageProps> = ({
 
         {/* 3. DIRECT 2-STEP INPUT CARD (NO MULAI TOOL GATE) */}
         <section className="bg-card border border-border/90 rounded-card-lg p-5 sm:p-6 shadow-card space-y-6">
-          <form onSubmit={handleCalculate} className="space-y-6">
+          <form onSubmit={handleCalculate} noValidate className="space-y-6">
             {/* STEP 1: DANA LIKUID */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -339,7 +339,6 @@ export const AmanBerapaBulanPage: React.FC<AmanBerapaBulanPageProps> = ({
                   id="funds-input"
                   type="text"
                   inputMode="numeric"
-                  pattern="[0-9]*"
                   value={fundsInput}
                   onChange={handleFundsChange}
                   placeholder="Contoh: 15.000.000"
@@ -387,7 +386,6 @@ export const AmanBerapaBulanPage: React.FC<AmanBerapaBulanPageProps> = ({
                   id="expense-input"
                   type="text"
                   inputMode="numeric"
-                  pattern="[0-9]*"
                   value={expenseInput}
                   onChange={handleExpenseChange}
                   placeholder="Contoh: 5.000.000"
